@@ -39,8 +39,8 @@ public class Ward {
     @Column(columnDefinition = "TEXT")
     private String boundaryGeoJson;
 
-    @Column(nullable = false)
-    private Boolean active = true;
+    @Column(nullable = false, columnDefinition = "boolean default true")
+    private Boolean active;
 
     @Column(updatable = false)
     private LocalDateTime createdAt;
@@ -49,6 +49,9 @@ public class Ward {
 
     @PrePersist
     protected void onCreate() {
+        if (active == null) {
+            active = true;
+        }
         createdAt = LocalDateTime.now();
         updatedAt = LocalDateTime.now();
     }
