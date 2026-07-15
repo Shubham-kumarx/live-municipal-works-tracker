@@ -10,7 +10,7 @@ import java.util.Optional;
 public class WardService {
     private final WardRepository wardRepository;
     public List<Ward> getAllActiveWards(){ // get all active wards
-        return wardRepository.findByIsActiveTrue();
+        return wardRepository.findByActiveTrue();
     }
     public List<Ward> getAllWards(){ // get all  wards.
         return wardRepository.findAll();

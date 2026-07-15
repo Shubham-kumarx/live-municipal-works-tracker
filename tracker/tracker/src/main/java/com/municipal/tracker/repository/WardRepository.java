@@ -8,6 +8,6 @@ import  java.util.Optional;
 public interface WardRepository extends JpaRepository<Ward, Long>{
     Optional<Ward> findByWardNumber(String wardNumber);
     List<Ward> findByCity(String city);
-    List<Ward> findByIsActiveTrue();
+    List<Ward> findByActiveTrue();
     boolean existsByWardNumber(String wardNumber);
 }
