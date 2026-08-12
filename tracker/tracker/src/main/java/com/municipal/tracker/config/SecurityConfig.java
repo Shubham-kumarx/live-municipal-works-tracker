@@ -53,6 +53,7 @@ public class SecurityConfig {
                         .requestMatchers("/api/auth/**").permitAll()
                         .requestMatchers("/api/wards").permitAll()
                         .requestMatchers("/api/wards/**").permitAll()
+                        .requestMatchers("/api/projects/ward/**").permitAll()
                         .anyRequest().authenticated()
                 )
                 .sessionManagement(session -> session
