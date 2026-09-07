@@ -1,4 +1,5 @@
 import { useEffect, useRef, useState } from 'react'
+import FieldUpdateForm from '../components/FieldUpdateForm'
 import api from '../api/axios'
 
 const STATUS_COLOR = {
@@ -40,6 +41,7 @@ export default function MapView() {
   const [typeFilter, setTypeFilter] = useState('all')
   const [loading, setLoading]     = useState(true)
   const [wsStatus, setWsStatus]   = useState('connecting')
+  const [showUpdateForm, setShowUpdateForm] = useState(false)
 
   // Get wardId from logged-in user
   const user   = JSON.parse(localStorage.getItem('user') || '{}')
@@ -457,19 +459,11 @@ export default function MapView() {
                 display: 'flex', flexDirection: 'column', gap: 6,
                 paddingTop: 12, borderTop: '1px solid var(--border)'
               }}>
-                <button
+               <button
                   className="btn btn-primary btn-sm w-full"
-                  onClick={() => {
-                    api.patch(`/api/projects/${selected.id}/flag`)
-                      .then(res => {
-                        setSelected(res.data)
-                        setProjects(prev =>
-                          prev.map(p => p.id === res.data.id ? res.data : p)
-                        )
-                      })
-                  }}
+                  onClick={() => setShowUpdateForm(true)}
                 >
-                  ⚑ Flag this project
+                  📝 Log progress update
                 </button>
                 <div style={{ display: 'flex', gap: 6 }}>
                   <button className="btn btn-sm w-full">View full details</button>
@@ -480,6 +474,19 @@ export default function MapView() {
             </div>
           </div>
         )}
+        {showUpdateForm && (
+          <FieldUpdateForm
+            project={selected}
+            onClose={() => setShowUpdateForm(false)}
+            onUpdated={() => {
+              api.get(`/api/projects/ward/${wardId}`)
+                .then(res => setProjects(res.data))
+
+              setSelected(null)
+              setShowUpdateForm(false)
+            }}
+          />
+        )}        
       </div>
     </div>
   )
