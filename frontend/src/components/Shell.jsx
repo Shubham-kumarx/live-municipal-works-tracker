@@ -1,21 +1,23 @@
 import { Outlet, NavLink, useNavigate } from 'react-router-dom'
 
+
+
 const NAV = [
   {
     section: 'Operations',
     links: [
-      { to: '/dashboard', label: 'Overview', icon: <IconGrid /> },
-      { to: '/work-orders', label: 'Work Orders', icon: <IconClipboard /> },
-      { to: '/map', label: 'Live Map', icon: <IconMap /> },
-      { to: '/field-teams', label: 'Field Teams', icon: <IconUsers /> },
+      { to: '/dashboard', label: 'Overview', icon: <IconGrid />, roles: ['MUNICIPAL_ADMIN', 'WARD_OFFICER'] },
+      { to: '/work-orders', label: 'Work Orders', icon: <IconClipboard />, roles: ['MUNICIPAL_ADMIN', 'WARD_OFFICER'] },
+      { to: '/map', label: 'Live Map', icon: <IconMap />, roles: ['CITIZEN', 'FIELD_WORKER', 'WARD_OFFICER', 'MUNICIPAL_ADMIN'] },
+      { to: '/field-teams', label: 'Field Teams', icon: <IconUsers />, roles: ['MUNICIPAL_ADMIN', 'WARD_OFFICER'] },
     ]
   },
   {
     section: 'Management',
     links: [
-      { to: '/complaints', label: 'Complaints', icon: <IconAlert /> },
-      { to: '/reports', label: 'Reports', icon: <IconChart /> },
-      { to: '/settings', label: 'Settings', icon: <IconSettings /> },
+      { to: '/complaints', label: 'Complaints', icon: <IconAlert />, roles: ['CITIZEN', 'MUNICIPAL_ADMIN', 'WARD_OFFICER'] },
+      { to: '/reports', label: 'Reports', icon: <IconChart />, roles: ['MUNICIPAL_ADMIN', 'WARD_OFFICER'] },
+      { to: '/settings', label: 'Settings', icon: <IconSettings />, roles: ['CITIZEN', 'FIELD_WORKER', 'WARD_OFFICER', 'MUNICIPAL_ADMIN'] },
     ]
   }
 ]
@@ -41,24 +43,36 @@ export default function Shell() {
 
         {/* Nav */}
         <nav style={{ flex: 1 }}>
-          {NAV.map(section => (
-            <div key={section.section}>
-              <div className="sidebar-section-label">{section.section}</div>
-              {section.links.map(link => (
-                <NavLink
-                  key={link.to}
-                  to={link.to}
-                  className={({ isActive }) =>
-                    'sidebar-link' + (isActive ? ' active' : '')
-                  }
-                >
-                  {link.icon}
-                  {link.label}
-                </NavLink>
-              ))}
+          {NAV.map(section => {
+            const visibleLinks = section.links.filter(l => l.roles.includes(user.role))
+            if (visibleLinks.length === 0) return null
+            return (
+              <div key={section.section}>
+                <div className="sidebar-section-label">{section.section}</div>
+                {visibleLinks.map(link => (
+                  <NavLink
+                    key={link.to}
+                    to={link.to}
+                    className={({ isActive }) => 'sidebar-link' + (isActive ? ' active' : '')}
+                  >
+                    {link.icon}
+                    {link.label}
+                  </NavLink>
+                ))}
+              </div>
+            )
+          })}
+
+          {(user.role === 'MUNICIPAL_ADMIN' || user.role === 'WARD_OFFICER') && (
+            <div>
+              <div className="sidebar-section-label">Admin</div>
+              <NavLink to="/add-staff" className={({ isActive }) => 'sidebar-link' + (isActive ? ' active' : '')}>
+                <IconUsers /> Add Team Member
+              </NavLink>
             </div>
-          ))}
+          )}
         </nav>
+        
 
         {/* Footer */}
         <div className="sidebar-footer">

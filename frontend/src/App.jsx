@@ -5,6 +5,8 @@ import WorkOrders from './pages/WorkOrders'
 import MapView from './pages/MapView'
 import FieldTeams from './pages/FieldTeams'
 import Login from './pages/Login'
+import Register from './pages/Register'
+import AddStaff from './pages/AddStaff'
 
 function ComingSoon({ page }) {
   return (
@@ -22,8 +24,10 @@ export default function App() {
   return (
     <BrowserRouter>
       <Routes>
+        <Route path="/register" element={<Register />} />
         <Route path="/login" element={<Login />} />
         <Route path="/" element={<Shell />}>
+          <Route path="add-staff" element={<AddStaff />} />
           <Route index element={<Navigate to="/dashboard" replace />} />
           <Route path="dashboard" element={<Dashboard />} />
           <Route path="work-orders" element={<WorkOrders />} />

@@ -42,10 +42,13 @@ export default function MapView() {
   const [loading, setLoading]     = useState(true)
   const [wsStatus, setWsStatus]   = useState('connecting')
   const [showUpdateForm, setShowUpdateForm] = useState(false)
+  
+  
 
   // Get wardId from logged-in user
   const user   = JSON.parse(localStorage.getItem('user') || '{}')
   const wardId = user.wardId || 2
+  const canUpdateStatus = ['FIELD_WORKER', 'WARD_OFFICER', 'MUNICIPAL_ADMIN'].includes(user.role)
 
   // ── Fetch projects from backend ──────────
   useEffect(() => {
@@ -459,12 +462,14 @@ export default function MapView() {
                 display: 'flex', flexDirection: 'column', gap: 6,
                 paddingTop: 12, borderTop: '1px solid var(--border)'
               }}>
-               <button
-                  className="btn btn-primary btn-sm w-full"
-                  onClick={() => setShowUpdateForm(true)}
-                >
-                  📝 Log progress update
-                </button>
+               {canUpdateStatus && (
+                  <button
+                    className="btn btn-primary btn-sm w-full"
+                    onClick={() => setShowUpdateForm(true)}
+                  >
+                    📝 Log progress update
+                  </button>
+                )}
                 <div style={{ display: 'flex', gap: 6 }}>
                   <button className="btn btn-sm w-full">View full details</button>
                   <button className="btn btn-sm w-full">Add photo</button>

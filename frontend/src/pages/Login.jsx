@@ -1,5 +1,5 @@
 import { useState } from 'react'
-import { useNavigate } from 'react-router-dom'
+import { useNavigate, Link } from 'react-router-dom'
 import axios from 'axios'
 
 export default function Login() {
@@ -229,6 +229,10 @@ export default function Login() {
         <div style={{ marginTop: 24, fontSize: 11.5, color: '#8A8F98', textAlign: 'center' }}>
           North Delhi Municipal Corporation · Internal system<br />
           Unauthorized access is prohibited
+        </div>
+        <div style={{ marginTop: 16, fontSize: 12.5, color: '#8A8F98', textAlign: 'center' }}>
+          New citizen?{' '}
+          <Link to="/register" style={{ color: '#1A4B6E', fontWeight: 500 }}>Create an account</Link>
         </div>
       </div>
     </div>
