@@ -1,4 +1,5 @@
 import { Outlet, NavLink, useNavigate } from 'react-router-dom'
+import { clearSession, getSession } from '../auth/session'
 
 
 
@@ -8,7 +9,7 @@ const NAV = [
     links: [
       { to: '/dashboard', label: 'Overview', icon: <IconGrid />, roles: ['MUNICIPAL_ADMIN', 'WARD_OFFICER'] },
       { to: '/work-orders', label: 'Work Orders', icon: <IconClipboard />, roles: ['MUNICIPAL_ADMIN', 'WARD_OFFICER'] },
-      { to: '/map', label: 'Live Map', icon: <IconMap />, roles: ['CITIZEN', 'FIELD_WORKER', 'WARD_OFFICER', 'MUNICIPAL_ADMIN'] },
+      { to: '/map', label: 'Live Map', icon: <IconMap />, roles: ['CITIZEN', 'FIELD_WORKER', 'WARD_OFFICER', 'MUNICIPAL_ADMIN', 'AUDITOR'] },
       { to: '/field-teams', label: 'Field Teams', icon: <IconUsers />, roles: ['MUNICIPAL_ADMIN', 'WARD_OFFICER'] },
     ]
   },
@@ -24,11 +25,10 @@ const NAV = [
 
 export default function Shell() {
   const navigate = useNavigate()
-  const user = JSON.parse(localStorage.getItem('user') || '{}')
+  const user = getSession()?.user || {}
 
   function handleLogout() {
-    localStorage.removeItem('token')
-    localStorage.removeItem('user')
+    clearSession()
     navigate('/login')
   }
 
@@ -151,7 +151,7 @@ export default function Shell() {
               color: 'var(--text-secondary)',
               background: 'var(--bg-hover)'
             }}>
-              Ward W-014 · Rohini
+              {user.wardId ? `Ward ${user.wardId}` : 'No ward assigned'}
             </div>
 
             {/* Notifications */}

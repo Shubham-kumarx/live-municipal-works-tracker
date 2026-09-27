@@ -1,6 +1,7 @@
 import { useState, useEffect } from 'react'
 import { useNavigate, Link } from 'react-router-dom'
 import api from '../api/axios'
+import { landingPath } from '../auth/session'
 function distanceKm(lat1, lng1, lat2, lng2) {
   const R = 6371
   const dLat = (lat2 - lat1) * Math.PI / 180
@@ -25,7 +26,9 @@ export default function Register() {
   const [detectedWardName, setDetectedWardName] = useState('')
 
   useEffect(() => {
-    api.get('/api/wards').then(res => setWards(res.data)).catch(() => {})
+    api.get('/api/wards')
+      .then(res => setWards(res.data))
+      .catch(() => setError('Wards could not be loaded. Please refresh and try again.'))
   }, [])
 function detectNearestWard() {
   setDetectingLocation(true)
@@ -79,7 +82,6 @@ function detectNearestWard() {
       const res = await api.post('/api/auth/register', {
         ...form,
         wardId: Number(form.wardId),
-        role: 'CITIZEN' // ignored by backend anyway, kept for clarity
       })
       localStorage.setItem('token', res.data.token)
       localStorage.setItem('user', JSON.stringify({
@@ -88,7 +90,7 @@ function detectNearestWard() {
         role: res.data.role,
         wardId: res.data.wardId,
       }))
-      navigate('/dashboard')
+      navigate(landingPath(res.data.role))
     } catch (err) {
       setError(err.response?.data?.message || 'Registration failed. Try again.')
     } finally {

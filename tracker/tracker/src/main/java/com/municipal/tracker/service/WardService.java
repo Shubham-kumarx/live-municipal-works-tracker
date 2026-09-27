@@ -5,6 +5,9 @@ import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
 import java.util.List;
 import java.util.Optional;
+import org.springframework.web.server.ResponseStatusException;
+import static org.springframework.http.HttpStatus.CONFLICT;
+import static org.springframework.http.HttpStatus.NOT_FOUND;
 @Service
 @RequiredArgsConstructor
 public class WardService {
@@ -26,7 +29,7 @@ public class WardService {
     }
     public Ward createWard(Ward ward){ // create new ward
         if(wardRepository.existsByWardNumber(ward.getWardNumber())){
-            throw new RuntimeException(
+            throw new ResponseStatusException(CONFLICT,
                     "Ward with number " + ward.getWardNumber() + " already exists"
             );
 
@@ -34,7 +37,7 @@ public class WardService {
         return wardRepository.save(ward);
     }
      public Ward updateWard(long id, Ward updatedWard){ // updating existing ward
-        Ward existingWard = wardRepository.findById(id).orElseThrow(() -> new RuntimeException("Ward not found with id: " + id));
+         Ward existingWard = wardRepository.findById(id).orElseThrow(() -> new ResponseStatusException(NOT_FOUND, "Ward not found with id: " + id));
         existingWard.setWardName(updatedWard.getWardName());
         existingWard.setCity(updatedWard.getCity());
         existingWard.setDistrict(updatedWard.getDistrict());
@@ -45,7 +48,7 @@ public class WardService {
         return wardRepository.save(existingWard);
      }
      public void deactivateWard(Long id){
-        Ward ward = wardRepository.findById(id).orElseThrow(() -> new RuntimeException("Ward not found with id: " + id));
+        Ward ward = wardRepository.findById(id).orElseThrow(() -> new ResponseStatusException(NOT_FOUND, "Ward not found with id: " + id));
         ward.setActive(false);
         wardRepository.save(ward);
      }

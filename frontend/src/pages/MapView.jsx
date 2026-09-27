@@ -1,6 +1,12 @@
-import { useEffect, useRef, useState } from 'react'
+import { useCallback, useEffect, useRef, useState } from 'react'
 import FieldUpdateForm from '../components/FieldUpdateForm'
 import api from '../api/axios'
+import { getSession } from '../auth/session'
+import { WS_URL } from '../config/backend'
+import L from 'leaflet'
+import 'leaflet/dist/leaflet.css'
+import SockJS from 'sockjs-client'
+import { Client } from '@stomp/stompjs'
 
 const STATUS_COLOR = {
   SANCTIONED:  '#854D0E',
@@ -34,94 +40,104 @@ export default function MapView() {
   const mapInstance = useRef(null)
   const markersRef  = useRef([])
   const stompRef    = useRef(null)
+  const fetchSequence = useRef(0)
+  const centeredWardRef = useRef(null)
 
   const [projects, setProjects]   = useState([])
-  const [selected, setSelected]   = useState(null)
+  const [selectedId, setSelectedId] = useState(null)
   const [filter, setFilter]       = useState('all')
   const [typeFilter, setTypeFilter] = useState('all')
   const [loading, setLoading]     = useState(true)
+  const [loadError, setLoadError] = useState('')
   const [wsStatus, setWsStatus]   = useState('connecting')
   const [showUpdateForm, setShowUpdateForm] = useState(false)
   
   
 
   // Get wardId from logged-in user
-  const user   = JSON.parse(localStorage.getItem('user') || '{}')
-  const wardId = user.wardId || 2
+  const user   = getSession()?.user || {}
+  const wardId = Number.isInteger(user.wardId) && user.wardId > 0 ? user.wardId : null
   const canUpdateStatus = ['FIELD_WORKER', 'WARD_OFFICER', 'MUNICIPAL_ADMIN'].includes(user.role)
+  const selected = projects.find(project => project.id === selectedId) || null
+
+  const loadProjects = useCallback(async (showLoading = false) => {
+    if (!wardId) {
+      setLoading(false)
+      setProjects([])
+      setLoadError('')
+      return
+    }
+    const sequence = ++fetchSequence.current
+    if (showLoading) setLoading(true)
+    try {
+      const res = await api.get(`/api/projects/ward/${wardId}`)
+      if (sequence === fetchSequence.current) {
+        setProjects(res.data)
+        setLoadError('')
+        setLoading(false)
+      }
+    } catch (err) {
+      console.error('Failed to load projects:', err)
+      if (sequence === fetchSequence.current) {
+        setLoadError('Projects could not be loaded. Please try again.')
+        setLoading(false)
+      }
+      throw err
+    }
+  }, [wardId])
 
   // ── Fetch projects from backend ──────────
   useEffect(() => {
-    setLoading(true)
-    api.get(`/api/projects/ward/${wardId}`)
-      .then(res => {
-        setProjects(res.data)
-        setLoading(false)
-      })
-      .catch(err => {
-        console.error('Failed to load projects:', err)
-        setLoading(false)
-      })
-  }, [wardId])
+    loadProjects(true).catch(() => {})
+  }, [loadProjects])
 
   // ── WebSocket connection ─────────────────
   useEffect(() => {
     const token = localStorage.getItem('token')
-    if (!token) return
+    if (!token || !wardId) {
+      setWsStatus('disconnected')
+      return
+    }
 
-    // Dynamically import SockJS and STOMP
-    import('@stomp/stompjs').then(({ Client }) => {
-      const SockJS = window.SockJS
-
-      const client = new Client({
-        webSocketFactory: () => new SockJS('http://localhost:8080/ws'),
-        connectHeaders: {},
+    const client = new Client({
+        webSocketFactory: () => new SockJS(WS_URL),
+        connectHeaders: { Authorization: `Bearer ${token}` },
+        beforeConnect: () => setWsStatus('connecting'),
         onConnect: () => {
           setWsStatus('connected')
+          loadProjects().catch(() => {})
           // Subscribe to ward's project updates
           client.subscribe(
             `/topic/ward/${wardId}/projects`,
             message => {
-              const update = JSON.parse(message.body)
-              // Update the project in state when WebSocket fires
-              setProjects(prev =>
-                prev.map(p =>
-                  p.id === update.projectId
-                    ? {
-                        ...p,
-                        status: update.status,
-                        progressPercentage: update.progressPercentage,
-                        flagged: update.flagged,
-                      }
-                    : p
-                )
-              )
+              JSON.parse(message.body)
+              loadProjects().catch(() => {})
             }
           )
         },
         onDisconnect: () => setWsStatus('disconnected'),
         onStompError: () => setWsStatus('error'),
+        onWebSocketError: () => setWsStatus('error'),
+        onWebSocketClose: () => setWsStatus('disconnected'),
         reconnectDelay: 5000,
-      })
-
-      client.activate()
-      stompRef.current = client
     })
+    client.activate()
+    stompRef.current = client
 
     return () => {
-      if (stompRef.current) stompRef.current.deactivate()
+      client.deactivate()
+      if (stompRef.current === client) stompRef.current = null
     }
-  }, [wardId])
+  }, [wardId, loadProjects])
 
   // ── Init Leaflet map ─────────────────────
   useEffect(() => {
     if (mapInstance.current) return
-    const L = window.L
-    if (!L || !mapRef.current) return
+    if (!mapRef.current) return
 
     const map = L.map(mapRef.current, {
-      center: [28.7180, 77.1120],
-      zoom: 14,
+      center: [20.5937, 78.9629],
+      zoom: 5,
     })
 
     L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
@@ -130,12 +146,34 @@ export default function MapView() {
     }).addTo(map)
 
     mapInstance.current = map
+    return () => {
+      markersRef.current = []
+      map.remove()
+      if (mapInstance.current === map) mapInstance.current = null
+    }
   }, [])
+
+  useEffect(() => {
+    if (!wardId || !mapInstance.current || centeredWardRef.current === wardId) return
+    const project = projects.find(item => Number.isFinite(item.latitude) && Number.isFinite(item.longitude))
+    if (project) {
+      mapInstance.current.setView([project.latitude, project.longitude], 14)
+      centeredWardRef.current = wardId
+      return
+    }
+    let cancelled = false
+    api.get(`/api/wards/${wardId}`).then(({ data }) => {
+      if (!cancelled && Number.isFinite(data.centerLatitude) && Number.isFinite(data.centerLongitude)) {
+        mapInstance.current?.setView([data.centerLatitude, data.centerLongitude], 14)
+        centeredWardRef.current = wardId
+      }
+    }).catch(() => {})
+    return () => { cancelled = true }
+  }, [wardId, projects])
 
   // ── Render markers when projects change ──
   useEffect(() => {
-    const L = window.L
-    if (!L || !mapInstance.current) return
+    if (!mapInstance.current) return
 
     // Remove old markers
     markersRef.current.forEach(m => m.remove())
@@ -149,40 +187,35 @@ export default function MapView() {
 
     filtered.forEach(project => {
       // Skip if no coordinates
-      if (!project.latitude || !project.longitude) return
+      if (!Number.isFinite(project.latitude) || !Number.isFinite(project.longitude)) return
 
       const color = STATUS_COLOR[project.status] || '#52575E'
 
+      const markerElement = document.createElement('div')
+      markerElement.title = project.projectName || ''
+      Object.assign(markerElement.style, {
+        width: '28px', height: '28px', borderRadius: '50% 50% 50% 0',
+        transform: 'rotate(-45deg)', background: color, border: '2.5px solid white',
+        boxShadow: '0 2px 6px rgba(0,0,0,0.35)', cursor: 'pointer', position: 'relative',
+      })
+      const center = document.createElement('div')
+      Object.assign(center.style, {
+        width: '10px', height: '10px', background: 'rgba(255,255,255,0.85)',
+        borderRadius: '50%', position: 'absolute', top: '50%', left: '50%',
+        transform: 'translate(-50%,-50%)',
+      })
+      markerElement.appendChild(center)
+
       const icon = L.divIcon({
         className: '',
-        html: `
-          <div title="${project.projectName}" style="
-            width: 28px; height: 28px;
-            border-radius: 50% 50% 50% 0;
-            transform: rotate(-45deg);
-            background: ${color};
-            border: 2.5px solid white;
-            box-shadow: 0 2px 6px rgba(0,0,0,0.35);
-            cursor: pointer;
-            position: relative;
-          ">
-            <div style="
-              width: 10px; height: 10px;
-              background: rgba(255,255,255,0.85);
-              border-radius: 50%;
-              position: absolute;
-              top: 50%; left: 50%;
-              transform: translate(-50%,-50%);
-            "></div>
-          </div>
-        `,
+        html: markerElement,
         iconSize: [28, 28],
         iconAnchor: [14, 28],
       })
 
       const marker = L.marker([project.latitude, project.longitude], { icon })
         .addTo(mapInstance.current)
-        .on('click', () => setSelected(project))
+        .on('click', () => setSelectedId(project.id))
 
       markersRef.current.push(marker)
     })
@@ -323,7 +356,23 @@ export default function MapView() {
         </div>
 
         {/* Empty state */}
-        {!loading && projects.length === 0 && (
+        {!loading && !wardId && (
+          <div style={{
+            position: 'absolute', top: '50%', left: '50%', transform: 'translate(-50%,-50%)',
+            zIndex: 500, background: 'var(--bg-surface)', border: '1px solid var(--border)',
+            borderRadius: 'var(--r-lg)', padding: '24px 32px', textAlign: 'center'
+          }}>
+            <div style={{ fontSize: 13, fontWeight: 500 }}>No ward is assigned to this account</div>
+          </div>
+        )}
+        {!loading && loadError && (
+          <div style={{
+            position: 'absolute', top: 16, left: '50%', transform: 'translateX(-50%)', zIndex: 1000,
+            background: 'var(--red-lt)', border: '1px solid #FCA5A5', color: 'var(--red)',
+            borderRadius: 'var(--r-md)', padding: '8px 12px', fontSize: 12.5
+          }}>{loadError}</div>
+        )}
+        {!loading && !loadError && wardId && projects.length === 0 && (
           <div style={{
             position: 'absolute', top: '50%', left: '50%',
             transform: 'translate(-50%,-50%)', zIndex: 500,
@@ -368,7 +417,7 @@ export default function MapView() {
                   </div>
                 </div>
                 <button
-                  onClick={() => setSelected(null)}
+                  onClick={() => setSelectedId(null)}
                   style={{
                     background: 'none', border: 'none',
                     color: '#6B7280', cursor: 'pointer',
@@ -424,7 +473,7 @@ export default function MapView() {
                   ['Budget spent', `₹${selected.budgetSpent?.toLocaleString('en-IN')}`],
                   ['Start date', selected.startDate],
                   ['Due date', selected.expectedEndDate || 'Not set'],
-                  ['Coordinates', selected.latitude && selected.longitude
+                  ['Coordinates', Number.isFinite(selected.latitude) && Number.isFinite(selected.longitude)
                     ? `${selected.latitude.toFixed(4)}, ${selected.longitude.toFixed(4)}`
                     : 'Not set'
                   ],
@@ -487,7 +536,7 @@ export default function MapView() {
               api.get(`/api/projects/ward/${wardId}`)
                 .then(res => setProjects(res.data))
 
-              setSelected(null)
+              setSelectedId(null)
               setShowUpdateForm(false)
             }}
           />

@@ -1,6 +1,7 @@
 import { useState } from 'react'
 import { useNavigate, Link } from 'react-router-dom'
-import axios from 'axios'
+import { landingPath } from '../auth/session'
+import api from '../api/axios'
 
 export default function Login() {
   const navigate = useNavigate()
@@ -19,10 +20,7 @@ export default function Login() {
 
     setLoading(true)
     try {
-      const res = await axios.post(
-        'http://localhost:8080/api/auth/login',
-        form
-      )
+      const res = await api.post('/api/auth/login', form)
       localStorage.setItem('token', res.data.token)
       localStorage.setItem('user', JSON.stringify({
         email: res.data.email,
@@ -30,7 +28,7 @@ export default function Login() {
         role: res.data.role,
         wardId: res.data.wardId,
       }))
-      navigate('/dashboard')
+      navigate(landingPath(res.data.role))
     } catch (err) {
       setError(
         err.response?.data?.message ||
@@ -83,11 +81,12 @@ export default function Login() {
           </div>
         </div>
 
-        {/* Stats row */}
+        {/* Sample stats row */}
         <div style={{
           display: 'grid', gridTemplateColumns: 'repeat(3,1fr)',
           gap: 0, borderTop: '1px solid #2E3238', paddingTop: 32
         }}>
+          <div style={{ gridColumn: '1 / -1', fontSize: 10, color: '#6B7280', marginBottom: 8 }}>Sample interface metrics</div>
           {[
             { num: '14', label: 'Wards covered' },
             { num: '340+', label: 'Active work orders' },
@@ -188,42 +187,6 @@ export default function Login() {
           </button>
 
         </form>
-
-        {/* Demo accounts */}
-        <div style={{
-          marginTop: 28,
-          padding: '14px 16px',
-          background: '#F7F6F3',
-          border: '1px solid #E2E0DB',
-          borderRadius: 'var(--r-lg)'
-        }}>
-          <div style={{ fontSize: 11, fontWeight: 500, color: '#8A8F98',
-            textTransform: 'uppercase', letterSpacing: '.5px', marginBottom: 10 }}>
-            Demo accounts
-          </div>
-          {[
-            { label: 'Municipal Admin', email: 'shubham@gmail.com', pass: 'secret123' },
-            { label: 'Ward Officer', email: 'officer@gmail.com', pass: 'officer123' },
-            { label: 'Field Worker', email: 'worker@gmail.com', pass: 'worker123' },
-          ].map(acc => (
-            <div
-              key={acc.email}
-              style={{
-                display: 'flex', justifyContent: 'space-between',
-                alignItems: 'center', padding: '6px 0',
-                borderBottom: '1px solid #E2E0DB',
-                cursor: 'pointer'
-              }}
-              onClick={() => setForm({ email: acc.email, password: acc.pass })}
-            >
-              <div>
-                <div style={{ fontSize: 12, fontWeight: 500, color: '#1C1F24' }}>{acc.label}</div>
-                <div style={{ fontSize: 11, color: '#8A8F98' }}>{acc.email}</div>
-              </div>
-              <span style={{ fontSize: 11, color: '#1A4B6E', fontWeight: 500 }}>Use →</span>
-            </div>
-          ))}
-        </div>
 
         {/* Footer */}
         <div style={{ marginTop: 24, fontSize: 11.5, color: '#8A8F98', textAlign: 'center' }}>

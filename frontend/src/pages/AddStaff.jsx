@@ -1,5 +1,6 @@
 import { useState } from 'react'
 import api from '../api/axios'
+import { getSession } from '../auth/session'
 
 export default function AddStaff() {
   const [form, setForm] = useState({
@@ -9,7 +10,7 @@ export default function AddStaff() {
   const [success, setSuccess] = useState('')
   const [loading, setLoading] = useState(false)
 
-  const user = JSON.parse(localStorage.getItem('user') || '{}')
+  const user = getSession()?.user || {}
 
   async function handleSubmit(e) {
     e.preventDefault()

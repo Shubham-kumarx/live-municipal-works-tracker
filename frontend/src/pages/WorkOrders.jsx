@@ -231,7 +231,7 @@ export default function WorkOrders() {
         <div className="page-header-left">
           <h1 className="t-page">Work Orders</h1>
           <span className="t-caption">
-            {ORDERS.length} total · {ORDERS.filter(o => o.status === 'overdue').length} overdue
+            Sample data · {ORDERS.length} example orders · {ORDERS.filter(o => o.status === 'overdue').length} marked overdue
           </span>
         </div>
         <div className="flex-center gap-8">

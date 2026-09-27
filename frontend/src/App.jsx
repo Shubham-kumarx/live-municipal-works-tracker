@@ -7,6 +7,8 @@ import FieldTeams from './pages/FieldTeams'
 import Login from './pages/Login'
 import Register from './pages/Register'
 import AddStaff from './pages/AddStaff'
+import ProtectedRoute from './components/ProtectedRoute'
+import { getSession, landingPath } from './auth/session'
 
 function ComingSoon({ page }) {
   return (
@@ -21,18 +23,19 @@ function ComingSoon({ page }) {
 }
 
 export default function App() {
+  const role = getSession()?.user.role
   return (
     <BrowserRouter>
       <Routes>
         <Route path="/register" element={<Register />} />
         <Route path="/login" element={<Login />} />
-        <Route path="/" element={<Shell />}>
-          <Route path="add-staff" element={<AddStaff />} />
-          <Route index element={<Navigate to="/dashboard" replace />} />
-          <Route path="dashboard" element={<Dashboard />} />
-          <Route path="work-orders" element={<WorkOrders />} />
-          <Route path="map" element={<MapView />} />
-          <Route path="field-teams" element={<FieldTeams />} />
+        <Route path="/" element={<ProtectedRoute><Shell /></ProtectedRoute>}>
+          <Route path="add-staff" element={<ProtectedRoute roles={['MUNICIPAL_ADMIN', 'WARD_OFFICER']}><AddStaff /></ProtectedRoute>} />
+          <Route index element={<Navigate to={role ? landingPath(role) : '/login'} replace />} />
+          <Route path="dashboard" element={<ProtectedRoute roles={['MUNICIPAL_ADMIN', 'WARD_OFFICER']}><Dashboard /></ProtectedRoute>} />
+          <Route path="work-orders" element={<ProtectedRoute roles={['MUNICIPAL_ADMIN', 'WARD_OFFICER']}><WorkOrders /></ProtectedRoute>} />
+          <Route path="map" element={<ProtectedRoute roles={['CITIZEN', 'FIELD_WORKER', 'WARD_OFFICER', 'MUNICIPAL_ADMIN', 'AUDITOR']}><MapView /></ProtectedRoute>} />
+          <Route path="field-teams" element={<ProtectedRoute roles={['MUNICIPAL_ADMIN', 'WARD_OFFICER']}><FieldTeams /></ProtectedRoute>} />
           <Route path="complaints" element={<ComingSoon page="Complaints" />} />
           <Route path="reports" element={<ComingSoon page="Reports" />} />
           <Route path="settings" element={<ComingSoon page="Settings" />} />

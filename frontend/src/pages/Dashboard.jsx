@@ -1,7 +1,7 @@
 
 import { useState, useEffect } from 'react'
-import axios from 'axios'
 import api from '../api/axios'
+import { getSession } from '../auth/session'
 
 const WORK_ORDERS = [
   { id: 'MW-2026-01842', title: 'Pothole repair near Sector 14 market', location: 'Sector 14, Block B', ward: 'W-014', dept: 'Roads', priority: 'high', worker: 'Zone B Road Crew', status: 'in_progress', due: 'Aug 15', progress: 62 },
@@ -39,7 +39,7 @@ function priBadge(p) {
 export default function Dashboard() {
   const [filter, setFilter] = useState('all')
   useEffect(() => {
-      const user = JSON.parse(localStorage.getItem('user') || '{}')
+      const user = getSession()?.user || {}
       if (user.wardId) {
         api.get(`/api/projects/ward/${user.wardId}/stats`)
           .then(res => console.log('Real stats:', res.data))
@@ -61,7 +61,7 @@ export default function Dashboard() {
       <div className="page-header">
         <div className="page-header-left">
           <h1 className="t-page">Operations Overview</h1>
-          <span className="t-caption">Ward W-014 · Rohini · North Delhi Municipal Corporation</span>
+          <span className="t-caption">Sample operational data · not live municipal records</span>
         </div>
         <div className="flex-center gap-8">
           <button className="btn btn-sm">Export report</button>
@@ -83,8 +83,8 @@ export default function Dashboard() {
         </div>
         <div className="kpi-cell">
           <div className="kpi-val" style={{ color: 'var(--green)' }}>{doneToday}</div>
-          <div className="kpi-label">Completed today</div>
-          <div className="kpi-sub">Aug 15, 2026</div>
+          <div className="kpi-label">Sample completed count</div>
+          <div className="kpi-sub">Demonstration value</div>
         </div>
         <div className="kpi-cell">
           <div className="kpi-val" style={{ color: 'var(--red)' }}>{critical}</div>

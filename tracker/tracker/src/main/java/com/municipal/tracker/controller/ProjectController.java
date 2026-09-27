@@ -1,6 +1,11 @@
 package com.municipal.tracker.controller;
 
 import com.municipal.tracker.model.MunicipalProject;
+import com.municipal.tracker.dto.ProjectResponse;
+import com.municipal.tracker.dto.ProjectStatusUpdateRequest;
+import com.municipal.tracker.dto.ProjectBudgetUpdateRequest;
+import com.municipal.tracker.dto.ProjectCreateRequest;
+import jakarta.validation.Valid;
 import com.municipal.tracker.model.ProjectStatus;
 import com.municipal.tracker.model.User;
 import com.municipal.tracker.service.ProjectService;
@@ -16,7 +21,6 @@ import java.util.Map;
 @RestController
 @RequestMapping("/api/projects")
 @RequiredArgsConstructor
-@CrossOrigin(origins = "*")
 public class ProjectController {
 
     private final ProjectService projectService;
@@ -24,20 +28,20 @@ public class ProjectController {
     // ── GET all projects in a ward (public - for map)
     // GET http://localhost:8080/api/projects/ward/2
     @GetMapping("/ward/{wardId}")
-    public ResponseEntity<List<MunicipalProject>> getProjectsByWard(
+    public ResponseEntity<List<ProjectResponse>> getProjectsByWard(
             @PathVariable Long wardId) {
         return ResponseEntity.ok(
-                projectService.getProjectsByWard(wardId)
+                projectService.getProjectsByWard(wardId).stream().map(ProjectResponse::from).toList()
         );
     }
 
     // ── GET single project by ID
     // GET http://localhost:8080/api/projects/1
     @GetMapping("/{id}")
-    public ResponseEntity<MunicipalProject> getProjectById(
+    public ResponseEntity<ProjectResponse> getProjectById(
             @PathVariable Long id) {
         return projectService.getProjectById(id)
-                .map(ResponseEntity::ok)
+                .map(ProjectResponse::from).map(ResponseEntity::ok)
                 .orElse(ResponseEntity.notFound().build());
     }
 
@@ -55,10 +59,12 @@ public class ProjectController {
     // GET http://localhost:8080/api/projects/ward/2/flagged
     @GetMapping("/ward/{wardId}/flagged")
     @PreAuthorize("hasAnyRole('WARD_OFFICER','MUNICIPAL_ADMIN','AUDITOR')")
-    public ResponseEntity<List<MunicipalProject>> getFlaggedProjects(
-            @PathVariable Long wardId) {
+    public ResponseEntity<List<ProjectResponse>> getFlaggedProjects(
+            @PathVariable Long wardId,
+            @AuthenticationPrincipal User currentUser) {
+        projectService.requireWardAccess(currentUser, wardId);
         return ResponseEntity.ok(
-                projectService.getFlaggedProjects(wardId)
+                projectService.getFlaggedProjects(wardId).stream().map(ProjectResponse::from).toList()
         );
     }
 
@@ -66,10 +72,10 @@ public class ProjectController {
     // GET http://localhost:8080/api/projects/my-projects
     @GetMapping("/my-projects")
     @PreAuthorize("hasRole('FIELD_WORKER')")
-    public ResponseEntity<List<MunicipalProject>> getMyProjects(
+    public ResponseEntity<List<ProjectResponse>> getMyProjects(
             @AuthenticationPrincipal User currentUser) {
         return ResponseEntity.ok(
-                projectService.getProjectsByWorker(currentUser.getId())
+                projectService.getProjectsByWorker(currentUser.getId()).stream().map(ProjectResponse::from).toList()
         );
     }
 
@@ -77,92 +83,58 @@ public class ProjectController {
     // POST http://localhost:8080/api/projects/ward/2
     @PostMapping("/ward/{wardId}")
     @PreAuthorize("hasAnyRole('MUNICIPAL_ADMIN','WARD_OFFICER')")
-    public ResponseEntity<MunicipalProject> createProject(
+    public ResponseEntity<ProjectResponse> createProject(
             @PathVariable Long wardId,
-            @RequestBody MunicipalProject project,
+            @Valid @RequestBody ProjectCreateRequest request,
             @AuthenticationPrincipal User currentUser) {
-        try {
-            MunicipalProject created = projectService.createProject(
-                    project, wardId, currentUser.getId()
-            );
-            return ResponseEntity
-                    .status(HttpStatus.CREATED)
-                    .body(created);
-        } catch (RuntimeException e) {
-            return ResponseEntity.badRequest().build();
-        }
+        MunicipalProject created = projectService.createProject(
+                request.toEntity(), wardId, currentUser.getId());
+        return ResponseEntity.status(HttpStatus.CREATED).body(ProjectResponse.from(created));
     }
 
     // ── UPDATE project status (Field Worker or Officer)
     // PATCH http://localhost:8080/api/projects/1/status
     @PatchMapping("/{id}/status")
     @PreAuthorize("hasAnyRole('FIELD_WORKER','WARD_OFFICER','MUNICIPAL_ADMIN')")
-    public ResponseEntity<MunicipalProject> updateStatus(
+    public ResponseEntity<ProjectResponse> updateStatus(
             @PathVariable Long id,
-            @RequestBody Map<String, Object> body) {
-        try {
-            ProjectStatus status = ProjectStatus.valueOf(
-                    (String) body.get("status")
-            );
-            String note = (String) body.get("progressNote");
-            Integer progress = body.get("progressPercentage") != null
-                    ? ((Number) body.get("progressPercentage")).intValue()
-                    : null;
-
-            MunicipalProject updated = projectService.updateStatus(
-                    id, status, note, progress
-            );
-            return ResponseEntity.ok(updated);
-        } catch (RuntimeException e) {
-            return ResponseEntity.badRequest().build();
-        }
+            @Valid @RequestBody ProjectStatusUpdateRequest body,
+            @AuthenticationPrincipal User currentUser) {
+        MunicipalProject updated = projectService.updateStatus(
+                id, body.getStatus(), body.getProgressNote(), body.getProgressPercentage(), currentUser
+        );
+        return ResponseEntity.ok(ProjectResponse.from(updated));
     }
 
     // ── ASSIGN worker to project (Officer/Admin only)
     // PATCH http://localhost:8080/api/projects/1/assign/3
     @PatchMapping("/{projectId}/assign/{workerId}")
     @PreAuthorize("hasAnyRole('WARD_OFFICER','MUNICIPAL_ADMIN')")
-    public ResponseEntity<MunicipalProject> assignWorker(
+    public ResponseEntity<ProjectResponse> assignWorker(
             @PathVariable Long projectId,
-            @PathVariable Long workerId) {
-        try {
-            return ResponseEntity.ok(
-                    projectService.assignWorker(projectId, workerId)
-            );
-        } catch (RuntimeException e) {
-            return ResponseEntity.badRequest().build();
-        }
+            @PathVariable Long workerId,
+            @AuthenticationPrincipal User currentUser) {
+        return ResponseEntity.ok(
+                ProjectResponse.from(projectService.assignWorker(projectId, workerId, currentUser)));
     }
 
     // ── FLAG a project (any logged-in citizen)
     // PATCH http://localhost:8080/api/projects/1/flag
     @PatchMapping("/{id}/flag")
-    public ResponseEntity<MunicipalProject> flagProject(
+    public ResponseEntity<ProjectResponse> flagProject(
             @PathVariable Long id) {
-        try {
-            return ResponseEntity.ok(
-                    projectService.flagProject(id)
-            );
-        } catch (RuntimeException e) {
-            return ResponseEntity.notFound().build();
-        }
+        return ResponseEntity.ok(ProjectResponse.from(projectService.flagProject(id)));
     }
 
     // ── UPDATE budget spent (Officer/Admin only)
     // PATCH http://localhost:8080/api/projects/1/budget
     @PatchMapping("/{id}/budget")
     @PreAuthorize("hasAnyRole('WARD_OFFICER','MUNICIPAL_ADMIN')")
-    public ResponseEntity<MunicipalProject> updateBudget(
+    public ResponseEntity<ProjectResponse> updateBudget(
             @PathVariable Long id,
-            @RequestBody Map<String, Double> body) {
-        try {
-            return ResponseEntity.ok(
-                    projectService.updateBudgetSpent(
-                            id, body.get("amountSpent")
-                    )
-            );
-        } catch (RuntimeException e) {
-            return ResponseEntity.notFound().build();
-        }
+            @Valid @RequestBody ProjectBudgetUpdateRequest body,
+            @AuthenticationPrincipal User currentUser) {
+        return ResponseEntity.ok(ProjectResponse.from(
+                projectService.updateBudgetSpent(id, body.getAmountSpent(), currentUser)));
     }
 }

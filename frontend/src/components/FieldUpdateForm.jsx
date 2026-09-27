@@ -6,13 +6,20 @@ export default function FieldUpdateForm({ project, onClose, onUpdated }) {
   const [progress, setProgress] = useState(project.progressPercentage || 0)
   const [note, setNote] = useState('')
   const [photos, setPhotos] = useState([])
-  const [previews, setPreviews] = useState([])
   const [gps, setGps] = useState(null)
   const [gpsLoading, setGpsLoading] = useState(false)
   const [gpsError, setGpsError] = useState('')
   const [submitting, setSubmitting] = useState(false)
   const [error, setError] = useState('')
+  const [statusSaved, setStatusSaved] = useState(false)
   const fileRef = useRef()
+  const allowedStatuses = {
+    SANCTIONED: ['SANCTIONED', 'IN_PROGRESS', 'CANCELLED'],
+    IN_PROGRESS: ['IN_PROGRESS', 'DELAYED', 'COMPLETED', 'CANCELLED'],
+    DELAYED: ['DELAYED', 'IN_PROGRESS', 'COMPLETED', 'CANCELLED'],
+    COMPLETED: ['COMPLETED'],
+    CANCELLED: ['CANCELLED'],
+  }[project.status] || [project.status]
 
   // Auto-capture GPS
   function captureGPS() {
@@ -27,7 +34,7 @@ export default function FieldUpdateForm({ project, onClose, onUpdated }) {
         })
         setGpsLoading(false)
       },
-      err => {
+      () => {
         setGpsError('Location access denied. Please enable GPS.')
         setGpsLoading(false)
       },
@@ -38,36 +45,40 @@ export default function FieldUpdateForm({ project, onClose, onUpdated }) {
   // Handle photo selection
   function handlePhotoChange(e) {
     const files = Array.from(e.target.files)
-    setPhotos(prev => [...prev, ...files])
     files.forEach(file => {
       const reader = new FileReader()
-      reader.onload = ev => setPreviews(prev => [...prev, ev.target.result])
+      const id = crypto.randomUUID()
+      reader.onload = ev => setPhotos(prev => [...prev, { id, file, preview: ev.target.result }])
       reader.readAsDataURL(file)
     })
   }
 
   function removePhoto(index) {
     setPhotos(prev => prev.filter((_, i) => i !== index))
-    setPreviews(prev => prev.filter((_, i) => i !== index))
   }
 
   async function handleSubmit(e) {
     e.preventDefault()
     setError('')
     setSubmitting(true)
+    let saved = statusSaved
 
     try {
       // 1. Update status and progress
-      await api.patch(`/api/projects/${project.id}/status`, {
-        status,
-        progressNote: note,
-        progressPercentage: progress
-      })
+      if (!statusSaved) {
+        await api.patch(`/api/projects/${project.id}/status`, {
+          status,
+          progressNote: note,
+          progressPercentage: progress
+        })
+        setStatusSaved(true)
+        saved = true
+      }
 
       // 2. Upload photos if any
       if (photos.length > 0) {
         const formData = new FormData()
-        photos.forEach(photo => formData.append('files', photo))
+        photos.forEach(photo => formData.append('files', photo.file))
         await api.post(
           `/api/upload/project/${project.id}/photos`,
           formData,
@@ -78,7 +89,9 @@ export default function FieldUpdateForm({ project, onClose, onUpdated }) {
       onUpdated()
       onClose()
     } catch (err) {
-      setError(err.response?.data?.message || 'Update failed. Try again.')
+      setError(saved
+        ? `Status was saved, but photos failed: ${err.response?.data?.message || 'Try the upload again.'}`
+        : (err.response?.data?.message || 'Update failed. Try again.'))
     } finally {
       setSubmitting(false)
     }
@@ -121,7 +134,7 @@ export default function FieldUpdateForm({ project, onClose, onUpdated }) {
           {/* GPS Section */}
           <div>
             <div className="t-label" style={{ marginBottom: 8 }}>
-              Field location (GPS)
+              Location preview (GPS)
             </div>
             {gps ? (
               <div style={{
@@ -164,7 +177,7 @@ export default function FieldUpdateForm({ project, onClose, onUpdated }) {
                   </div>
                 )}
                 <div style={{ fontSize: 11, color: 'var(--text-muted)', marginTop: 5 }}>
-                  Browser will ask for location permission. GPS location is attached to this update.
+                  Browser permission is used only for this preview. Coordinates are not submitted or stored.
                 </div>
               </div>
             )}
@@ -180,10 +193,12 @@ export default function FieldUpdateForm({ project, onClose, onUpdated }) {
               value={status}
               onChange={e => setStatus(e.target.value)}
             >
-              <option value="SANCTIONED">Sanctioned (not started)</option>
-              <option value="IN_PROGRESS">In Progress</option>
-              <option value="COMPLETED">Completed</option>
-              <option value="DELAYED">Delayed</option>
+              {allowedStatuses.map(value => (
+                <option key={value} value={value}>
+                  {{ SANCTIONED: 'Sanctioned (not started)', IN_PROGRESS: 'In Progress',
+                    COMPLETED: 'Completed', DELAYED: 'Delayed', CANCELLED: 'Cancelled' }[value]}
+                </option>
+              ))}
             </select>
           </div>
 
@@ -252,7 +267,7 @@ export default function FieldUpdateForm({ project, onClose, onUpdated }) {
             <input
               ref={fileRef}
               type="file"
-              accept="image/*"
+              accept="image/jpeg,image/png,.jpg,.jpeg,.png"
               capture="environment"
               multiple
               style={{ display: 'none' }}
@@ -274,15 +289,15 @@ export default function FieldUpdateForm({ project, onClose, onUpdated }) {
             </div>
 
             {/* Photo previews */}
-            {previews.length > 0 && (
+            {photos.length > 0 && (
               <div style={{
                 display: 'grid', gridTemplateColumns: 'repeat(3,1fr)',
                 gap: 8, marginTop: 12
               }}>
-                {previews.map((src, i) => (
-                  <div key={i} style={{ position: 'relative' }}>
+                {photos.map((photo, i) => (
+                  <div key={photo.id} style={{ position: 'relative' }}>
                     <img
-                      src={src}
+                      src={photo.preview}
                       alt={`Photo ${i + 1}`}
                       style={{
                         width: '100%', aspectRatio: '1',

@@ -114,7 +114,7 @@ export default function FieldTeams() {
           <div className="page-header-left">
             <h1 className="t-page">Field Teams</h1>
             <span className="t-caption">
-              {TEAMS.length} teams · {TEAMS.filter(t => t.status === 'on_site').length} on site · {TEAMS.filter(t => t.status === 'transit').length} in transit
+              Sample data · {TEAMS.length} example teams · not live worker locations
             </span>
           </div>
           <button className="btn btn-primary btn-sm">+ Add team</button>
@@ -142,7 +142,7 @@ export default function FieldTeams() {
             <div className="kpi-val" style={{ color: 'var(--green)' }}>
               {TEAMS.reduce((s, t) => s + t.today.completed, 0)}
             </div>
-            <div className="kpi-label">Completed today</div>
+            <div className="kpi-label">Sample completed</div>
           </div>
         </div>
 
@@ -252,7 +252,7 @@ export default function FieldTeams() {
           {/* Task list */}
           <div className="panel">
             <div className="panel-header">
-              <span className="t-strong">Today's Tasks</span>
+              <span className="t-strong">Sample Tasks</span>
             </div>
             <table className="data-table">
               <thead>
@@ -305,4 +305,4 @@ export default function FieldTeams() {
       )}
     </div>
   )
-}   
+}
