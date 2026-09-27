@@ -3,6 +3,7 @@ package com.municipal.tracker.dto;
 import com.municipal.tracker.model.MunicipalProject;
 import com.municipal.tracker.model.ProjectStatus;
 import com.municipal.tracker.model.ProjectType;
+import com.municipal.tracker.model.ProjectImpactLevel;
 import lombok.Builder;
 import lombok.Data;
 
@@ -28,6 +29,7 @@ public class ProjectResponse {
     private LocalDate actualEndDate;
     private Integer progressPercentage;
     private String progressNote;
+    private ProjectImpactLevel impactLevel;
     private Long wardId;
     private UserSummary assignedWorker;
     private UserSummary createdBy;
@@ -54,6 +56,7 @@ public class ProjectResponse {
                 .budgetSpent(project.getBudgetSpent()).startDate(project.getStartDate())
                 .expectedEndDate(project.getExpectedEndDate()).actualEndDate(project.getActualEndDate())
                 .progressPercentage(project.getProgressPercentage()).progressNote(project.getProgressNote())
+                .impactLevel(project.getImpactLevel())
                 .wardId(project.getWard() == null ? null : project.getWard().getId())
                 .assignedWorker(summary(project.getAssignedWorker())).createdBy(summary(project.getCreatedBy()))
                 .photoUrls(project.getPhotoUrls() == null ? List.of() : List.copyOf(project.getPhotoUrls()))

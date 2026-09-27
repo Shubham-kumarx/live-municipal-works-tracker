@@ -31,6 +31,13 @@ public class ProjectAccessService {
         throw new AccessDeniedException("You cannot access this ward");
     }
 
+    public void requireProjectWardAccess(User actor, MunicipalProject project) {
+        if (project == null || project.getWard() == null) {
+            throw new AccessDeniedException("Project ward is unavailable");
+        }
+        requireWardAccess(actor, project.getWard().getId());
+    }
+
     private boolean sameWard(User actor, MunicipalProject project) {
         return actor.getWard() != null && project.getWard() != null
                 && actor.getWard().getId().equals(project.getWard().getId());

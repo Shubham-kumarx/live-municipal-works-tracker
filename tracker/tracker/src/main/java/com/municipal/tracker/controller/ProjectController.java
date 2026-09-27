@@ -5,10 +5,14 @@ import com.municipal.tracker.dto.ProjectResponse;
 import com.municipal.tracker.dto.ProjectStatusUpdateRequest;
 import com.municipal.tracker.dto.ProjectBudgetUpdateRequest;
 import com.municipal.tracker.dto.ProjectCreateRequest;
+import com.municipal.tracker.dto.ProjectImpactUpdateRequest;
+import com.municipal.tracker.dto.ProjectPriorityResponse;
 import jakarta.validation.Valid;
 import com.municipal.tracker.model.ProjectStatus;
 import com.municipal.tracker.model.User;
 import com.municipal.tracker.service.ProjectService;
+import com.municipal.tracker.service.ProjectAccessService;
+import com.municipal.tracker.service.PriorityCalculationService;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
@@ -24,6 +28,8 @@ import java.util.Map;
 public class ProjectController {
 
     private final ProjectService projectService;
+    private final PriorityCalculationService priorityCalculationService;
+    private final ProjectAccessService projectAccessService;
 
     // ── GET all projects in a ward (public - for map)
     // GET http://localhost:8080/api/projects/ward/2
@@ -136,5 +142,25 @@ public class ProjectController {
             @AuthenticationPrincipal User currentUser) {
         return ResponseEntity.ok(ProjectResponse.from(
                 projectService.updateBudgetSpent(id, body.getAmountSpent(), currentUser)));
+    }
+
+    @PatchMapping("/{id}/impact")
+    @PreAuthorize("hasAnyRole('WARD_OFFICER','MUNICIPAL_ADMIN')")
+    public ResponseEntity<ProjectResponse> updateImpact(
+            @PathVariable Long id,
+            @Valid @RequestBody ProjectImpactUpdateRequest body,
+            @AuthenticationPrincipal User currentUser) {
+        return ResponseEntity.ok(ProjectResponse.from(
+                projectService.updateImpactLevel(id, body.getImpactLevel(), currentUser)));
+    }
+
+    @GetMapping("/{id}/priority")
+    @PreAuthorize("hasAnyRole('CITIZEN','FIELD_WORKER','WARD_OFFICER','MUNICIPAL_ADMIN','AUDITOR')")
+    public ResponseEntity<ProjectPriorityResponse> getPriority(
+            @PathVariable Long id,
+            @AuthenticationPrincipal User currentUser) {
+        PriorityCalculationService.Calculation calculation = priorityCalculationService.calculate(id);
+        projectAccessService.requireProjectWardAccess(currentUser, calculation.project());
+        return ResponseEntity.ok(ProjectPriorityResponse.from(calculation));
     }
 }

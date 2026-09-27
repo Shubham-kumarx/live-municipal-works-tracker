@@ -2,6 +2,7 @@ package com.municipal.tracker.dto;
 
 import com.municipal.tracker.model.MunicipalProject;
 import com.municipal.tracker.model.ProjectType;
+import com.municipal.tracker.model.ProjectImpactLevel;
 import jakarta.validation.constraints.*;
 import lombok.Data;
 
@@ -21,6 +22,7 @@ public class ProjectCreateRequest {
     private Double budgetAllocated;
     @NotNull(message = "Start date is required") private LocalDate startDate;
     private LocalDate expectedEndDate;
+    private ProjectImpactLevel impactLevel;
 
     public MunicipalProject toEntity() {
         MunicipalProject project = new MunicipalProject();
@@ -28,6 +30,7 @@ public class ProjectCreateRequest {
         project.setLatitude(latitude); project.setLongitude(longitude); project.setLocationAddress(locationAddress);
         project.setBudgetAllocated(budgetAllocated); project.setStartDate(startDate);
         project.setExpectedEndDate(expectedEndDate);
+        project.setImpactLevel(impactLevel);
         return project;
     }
 }

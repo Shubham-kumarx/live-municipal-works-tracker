@@ -217,6 +217,22 @@ public class ProjectService {
         return updated;
     }
 
+    public MunicipalProject updateImpactLevel(Long projectId, ProjectImpactLevel impactLevel, User actor) {
+        MunicipalProject project = projectRepository.findById(projectId)
+                .orElseThrow(() -> new ResponseStatusException(NOT_FOUND,
+                        "Project not found: " + projectId));
+
+        projectAccessService.requireOfficerWardAccess(actor, project);
+        if (impactLevel == null) {
+            throw new IllegalArgumentException("Impact level is required");
+        }
+
+        project.setImpactLevel(impactLevel);
+        MunicipalProject updated = projectRepository.save(project);
+        broadcastToWard(project.getWard().getId(), "IMPACT_UPDATED", updated);
+        return updated;
+    }
+
     public void requireWardAccess(User actor, Long wardId) {
         projectAccessService.requireWardAccess(actor, wardId);
     }
