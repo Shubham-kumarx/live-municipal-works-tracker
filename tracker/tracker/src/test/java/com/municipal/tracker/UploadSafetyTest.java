@@ -6,6 +6,7 @@ import com.municipal.tracker.repository.ProjectRepository;
 import com.municipal.tracker.service.ProjectAccessService;
 import com.municipal.tracker.service.ProjectPhotoService;
 import com.municipal.tracker.service.ProjectService;
+import com.municipal.tracker.service.MunicipalImageValidator;
 import org.junit.jupiter.api.Test;
 import org.springframework.mock.web.MockMultipartFile;
 import org.springframework.web.server.ResponseStatusException;
@@ -22,7 +23,7 @@ class UploadSafetyTest {
     @Test
     void t22ApprovedMimeTypesAreExplicitlyLimited() throws java.io.IOException {
         assertThat(java.nio.file.Files.readString(java.nio.file.Path.of(
-                "src/main/java/com/municipal/tracker/service/ProjectPhotoService.java")))
+                "src/main/java/com/municipal/tracker/service/MunicipalImageValidator.java")))
                 .contains("image/jpeg", "image/png").doesNotContain("image/gif");
     }
 
@@ -32,7 +33,8 @@ class UploadSafetyTest {
         ProjectAccessService access = mock(ProjectAccessService.class);
         User actor = new User();
         when(repository.findById(1L)).thenReturn(Optional.of(new MunicipalProject()));
-        ProjectPhotoService service = new ProjectPhotoService(repository, access, mock(ProjectService.class));
+        ProjectPhotoService service = new ProjectPhotoService(
+                repository, access, mock(ProjectService.class), new MunicipalImageValidator());
 
         MockMultipartFile empty = new MockMultipartFile("photos", "photo.png", "image/png", new byte[0]);
         MockMultipartFile oversized = new MockMultipartFile(
@@ -50,7 +52,8 @@ class UploadSafetyTest {
         ProjectRepository repository = mock(ProjectRepository.class);
         ProjectAccessService access = mock(ProjectAccessService.class);
         when(repository.findById(1L)).thenReturn(Optional.of(new MunicipalProject()));
-        ProjectPhotoService service = new ProjectPhotoService(repository, access, mock(ProjectService.class));
+        ProjectPhotoService service = new ProjectPhotoService(
+                repository, access, mock(ProjectService.class), new MunicipalImageValidator());
 
         MockMultipartFile mismatch = new MockMultipartFile(
                 "photos", "photo.jpg", "image/png", new byte[]{1, 2, 3});

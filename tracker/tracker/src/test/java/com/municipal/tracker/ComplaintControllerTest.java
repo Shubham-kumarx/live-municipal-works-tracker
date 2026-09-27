@@ -1,0 +1,95 @@
+package com.municipal.tracker;
+
+import com.municipal.tracker.dto.AIAnalysisResponse;
+import com.municipal.tracker.dto.ComplaintResponse;
+import com.municipal.tracker.model.*;
+import com.municipal.tracker.service.ComplaintService;
+import com.municipal.tracker.service.ImageAnalysisService;
+import org.junit.jupiter.api.Test;
+import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.boot.test.context.SpringBootTest;
+import org.springframework.boot.webmvc.test.autoconfigure.AutoConfigureMockMvc;
+import org.springframework.mock.web.MockMultipartFile;
+import org.springframework.security.test.context.support.WithMockUser;
+import org.springframework.test.context.ActiveProfiles;
+import org.springframework.test.context.bean.override.mockito.MockitoBean;
+import org.springframework.test.web.servlet.MockMvc;
+import org.springframework.web.server.ResponseStatusException;
+
+import java.time.LocalDateTime;
+
+import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.nullable;
+import static org.mockito.Mockito.when;
+import static org.springframework.http.HttpStatus.SERVICE_UNAVAILABLE;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.multipart;
+import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
+import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
+
+@SpringBootTest
+@AutoConfigureMockMvc
+@ActiveProfiles("test")
+class ComplaintControllerTest {
+    @Autowired MockMvc mockMvc;
+    @MockitoBean ImageAnalysisService imageAnalysisService;
+    @MockitoBean ComplaintService complaintService;
+
+    @Test
+    @WithMockUser(roles = "CITIZEN")
+    void citizenCanAnalyzeThroughSpringEndpoint() throws Exception {
+        when(imageAnalysisService.analyze(any())).thenReturn(new AIAnalysisResponse(
+                ComplaintIssueType.POTHOLE, ComplaintIssueType.POTHOLE, 0.91,
+                AIAnalysisResponse.ConfidenceLevel.HIGH, ComplaintCategory.ROAD,
+                ComplaintSeverity.HIGH, false));
+        MockMultipartFile image = new MockMultipartFile(
+                "image", "road.png", "image/png", new byte[]{1, 2, 3});
+
+        mockMvc.perform(multipart("/api/complaints/analyze").file(image))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.issueType").value("POTHOLE"));
+    }
+
+    @Test
+    @WithMockUser(roles = "WARD_OFFICER")
+    void nonCitizenCannotAnalyze() throws Exception {
+        MockMultipartFile image = new MockMultipartFile(
+                "image", "road.png", "image/png", new byte[]{1});
+        mockMvc.perform(multipart("/api/complaints/analyze").file(image))
+                .andExpect(status().isForbidden());
+    }
+
+    @Test
+    @WithMockUser(roles = "CITIZEN")
+    void citizenCanCreateMultipartComplaint() throws Exception {
+        ComplaintResponse saved = new ComplaintResponse(44L, 5L, "Citizen",
+                "/uploads/complaints/test.png", "Pothole", "Test Road", null, null,
+                null, null, null, null, ComplaintIssueType.POTHOLE, ComplaintSeverity.HIGH,
+                ComplaintPredictionState.MANUAL, ComplaintStatus.SUBMITTED, null,
+                LocalDateTime.now(), LocalDateTime.now());
+        when(complaintService.create(any(), any(), nullable(User.class))).thenReturn(saved);
+        MockMultipartFile request = new MockMultipartFile("complaint", "", "application/json", """
+                {"description":"Pothole","locationAddress":"Test Road","finalIssueType":"POTHOLE",
+                 "finalSeverity":"HIGH","predictionState":"MANUAL"}
+                """.getBytes());
+        MockMultipartFile image = new MockMultipartFile(
+                "image", "road.png", "image/png", new byte[]{1, 2, 3});
+
+        mockMvc.perform(multipart("/api/complaints").file(request).file(image))
+                .andExpect(status().isCreated())
+                .andExpect(jsonPath("$.id").value(44));
+    }
+
+    @Test
+    @WithMockUser(roles = "CITIZEN")
+    void aiOutageReturnsServiceUnavailableWithManualFallbackMessage() throws Exception {
+        when(imageAnalysisService.analyze(any())).thenThrow(new ResponseStatusException(
+                SERVICE_UNAVAILABLE, "AI analysis is temporarily unavailable; continue with manual classification"));
+        MockMultipartFile image = new MockMultipartFile(
+                "image", "road.png", "image/png", new byte[]{1});
+
+        mockMvc.perform(multipart("/api/complaints/analyze").file(image))
+                .andExpect(status().isServiceUnavailable())
+                .andExpect(jsonPath("$.message").value(
+                        "AI analysis is temporarily unavailable; continue with manual classification"));
+    }
+}

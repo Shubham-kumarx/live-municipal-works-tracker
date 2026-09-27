@@ -299,3 +299,31 @@ a { text-decoration: none; color: inherit; }
 .w-full { width: 100%; }
 .grid-2 { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; }
 .grid-3 { display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 16px; }
+
+/* Complaint submission */
+.complaint-page { max-width: 880px; }
+.complaint-panel { margin-bottom: 16px; }
+.complaint-upload {
+  min-height: 240px; border: 1px dashed var(--border-strong); border-radius: var(--r-md);
+  background: var(--bg-hover); display: flex; align-items: center; justify-content: center;
+  color: var(--text-secondary); cursor: pointer; overflow: hidden;
+}
+.complaint-upload input { position: absolute; width: 1px; height: 1px; opacity: 0; }
+.complaint-upload img { width: 100%; max-height: 420px; object-fit: contain; background: #111; }
+.complaint-file-row { display: flex; align-items: center; justify-content: space-between; margin-top: 8px; }
+.complaint-message { margin-top: 10px; padding: 9px 11px; border-radius: var(--r-md); font-size: 12px; }
+.complaint-error { color: var(--red); background: var(--red-lt); }
+.complaint-success { color: var(--green); background: var(--green-lt); }
+.complaint-ai-note { color: var(--text-secondary); background: var(--blue-lt); }
+.complaint-actions { display: flex; align-items: center; flex-wrap: wrap; gap: 8px; margin-top: 14px; }
+.complaint-actions .btn:disabled { opacity: .5; cursor: not-allowed; }
+.complaint-prediction-grid { display: grid; grid-template-columns: repeat(4, 1fr); gap: 16px; }
+.complaint-prediction-grid > div { display: flex; flex-direction: column; gap: 4px; }
+.complaint-form-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; }
+.complaint-form-grid label { display: flex; flex-direction: column; gap: 6px; }
+.complaint-form-wide { grid-column: 1 / -1; }
+.complaint-textarea { height: 88px; padding: 8px 10px; resize: vertical; }
+.complaint-submit-row { display: flex; align-items: center; justify-content: space-between; gap: 16px; }
+@media (max-width: 760px) {
+  .complaint-prediction-grid, .complaint-form-grid { grid-template-columns: 1fr; }
+}

@@ -1,1 +1,6 @@
 .codex-build/
+ai-service/.model-cache/
+ai-service/.pytest_cache/
+ai-service/.venv/
+ai-service/**/__pycache__/
+uploads/complaints/
