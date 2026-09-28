@@ -8,6 +8,7 @@ export default function AdminComplaints() {
   const [projects, setProjects] = useState([])
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState('')
+  const [success, setSuccess] = useState('')
   const [selections, setSelections] = useState({})
   const [busyId, setBusyId] = useState(null)
 
@@ -35,11 +36,12 @@ export default function AdminComplaints() {
   async function linkComplaint(complaintId) {
     const projectId = Number(selections[complaintId])
     if (!projectId) return
-    setBusyId(complaintId); setError('')
+    setBusyId(complaintId); setError(''); setSuccess('')
     try {
       await api.patch(`/api/complaints/${complaintId}/project/${projectId}`)
       setSelections(current => ({ ...current, [complaintId]: '' }))
       await loadData()
+      setSuccess(`Complaint #${complaintId} was linked successfully.`)
     } catch (requestError) {
       setError(requestError.response?.data?.message || 'Complaint could not be linked.')
     } finally {
@@ -48,10 +50,11 @@ export default function AdminComplaints() {
   }
 
   async function unlinkComplaint(complaintId) {
-    setBusyId(complaintId); setError('')
+    setBusyId(complaintId); setError(''); setSuccess('')
     try {
       await api.delete(`/api/complaints/${complaintId}/project`)
       await loadData()
+      setSuccess(`Complaint #${complaintId} was unlinked successfully.`)
     } catch (requestError) {
       setError(requestError.response?.data?.message || 'Complaint could not be unlinked.')
     } finally {
@@ -69,13 +72,16 @@ export default function AdminComplaints() {
         <button className="btn btn-sm" onClick={loadData} disabled={loading}>Refresh</button>
       </div>
 
-      {error && <div className="complaint-message complaint-error">{error}</div>}
+      {error && <div className="complaint-message complaint-error" role="alert">
+        {error} <button className="btn btn-ghost btn-sm" onClick={loadData}>Retry</button>
+      </div>}
+      {success && <div className="complaint-message complaint-success" role="status">{success}</div>}
       {loading ? (
         <div className="panel"><div className="panel-body t-caption">Loading complaints...</div></div>
       ) : complaints.length === 0 ? (
         <div className="panel"><div className="panel-body t-caption">No complaints are available.</div></div>
       ) : (
-        <div className="panel" style={{ overflowX: 'auto' }}>
+        <div className="panel operational-table" style={{ overflowX: 'auto' }}>
           <table className="data-table">
             <thead><tr>
               <th>ID</th><th>Issue</th><th>Severity</th><th>Location</th>
@@ -98,10 +104,11 @@ export default function AdminComplaints() {
                       {!complaint.municipalProjectId && (
                         <div style={{ display: 'flex', gap: 6 }}>
                           <select className="input input-sm" value={selections[complaint.id] || ''}
+                            disabled={projects.length === 0 || busyId === complaint.id}
                             onChange={event => setSelections(current => ({
                               ...current, [complaint.id]: event.target.value
                             }))}>
-                            <option value="">Select work</option>
+                            <option value="">{projects.length === 0 ? 'No linkable work' : 'Select work'}</option>
                             {projects.map(project => (
                               <option key={project.id} value={project.id}>
                                 #{project.id} {project.projectName}
@@ -111,14 +118,14 @@ export default function AdminComplaints() {
                           <button className="btn btn-primary btn-sm"
                             disabled={!selections[complaint.id] || busyId === complaint.id}
                             onClick={() => linkComplaint(complaint.id)}>
-                            Link
+                            {busyId === complaint.id ? 'Linking...' : 'Link'}
                           </button>
                         </div>
                       )}
                       {complaint.municipalProjectId && (
                         <button className="btn btn-sm" disabled={busyId === complaint.id}
                           onClick={() => unlinkComplaint(complaint.id)}>
-                          Unlink
+                          {busyId === complaint.id ? 'Unlinking...' : 'Unlink'}
                         </button>
                       )}
                     </td>

@@ -9,7 +9,7 @@ import Register from './pages/Register'
 import AddStaff from './pages/AddStaff'
 import Complaints from './pages/Complaints'
 import AdminComplaints from './pages/AdminComplaints'
-import ProtectedRoute from './components/ProtectedRoute'
+import ProtectedRoute, { PublicOnlyRoute } from './components/ProtectedRoute'
 import { getSession, landingPath } from './auth/session'
 
 function ComingSoon({ page }) {
@@ -29,8 +29,8 @@ export default function App() {
   return (
     <BrowserRouter>
       <Routes>
-        <Route path="/register" element={<Register />} />
-        <Route path="/login" element={<Login />} />
+        <Route path="/register" element={<PublicOnlyRoute><Register /></PublicOnlyRoute>} />
+        <Route path="/login" element={<PublicOnlyRoute><Login /></PublicOnlyRoute>} />
         <Route path="/" element={<ProtectedRoute><Shell /></ProtectedRoute>}>
           <Route path="add-staff" element={<ProtectedRoute roles={['MUNICIPAL_ADMIN', 'WARD_OFFICER']}><AddStaff /></ProtectedRoute>} />
           <Route index element={<Navigate to={role ? landingPath(role) : '/login'} replace />} />
@@ -43,9 +43,10 @@ export default function App() {
               {role === 'CITIZEN' ? <Complaints /> : <AdminComplaints />}
             </ProtectedRoute>
           } />
-          <Route path="reports" element={<ComingSoon page="Reports" />} />
-          <Route path="settings" element={<ComingSoon page="Settings" />} />
+          <Route path="reports" element={<ProtectedRoute roles={['MUNICIPAL_ADMIN', 'WARD_OFFICER']}><ComingSoon page="Reports" /></ProtectedRoute>} />
+          <Route path="settings" element={<ProtectedRoute roles={['CITIZEN', 'FIELD_WORKER', 'WARD_OFFICER', 'MUNICIPAL_ADMIN']}><ComingSoon page="Settings" /></ProtectedRoute>} />
         </Route>
+        <Route path="*" element={<Navigate to={role ? landingPath(role) : '/login'} replace />} />
       </Routes>
     </BrowserRouter>
   )

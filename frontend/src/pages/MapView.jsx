@@ -40,6 +40,12 @@ const DELAY_RISK_LABEL = {
   AT_RISK: 'At risk',
   HIGH_DELAY_RISK: 'High delay risk',
 }
+const PRIORITY_STYLE = {
+  LOW: { background: 'var(--green-lt)', color: 'var(--green)' },
+  MEDIUM: { background: 'var(--amber-lt)', color: 'var(--amber)' },
+  HIGH: { background: 'var(--red-lt)', color: 'var(--red)' },
+  CRITICAL: { background: 'var(--red-lt)', color: 'var(--red)', fontWeight: 600 },
+}
 
 const DELAY_RISK_STYLE = {
   ON_TRACK: { background: 'var(--green-lt)', color: 'var(--green)' },
@@ -71,9 +77,16 @@ export default function MapView() {
   const [delayRisk, setDelayRisk] = useState(null)
   const [delayRiskLoading, setDelayRiskLoading] = useState(false)
   const [delayRiskError, setDelayRiskError] = useState('')
+  const [priority, setPriority] = useState(null)
+  const [priorityLoading, setPriorityLoading] = useState(false)
+  const [priorityError, setPriorityError] = useState('')
+  const [priorityRetry, setPriorityRetry] = useState(0)
   const [linkedComplaints, setLinkedComplaints] = useState([])
   const [linkedComplaintsLoading, setLinkedComplaintsLoading] = useState(false)
   const [linkedComplaintsError, setLinkedComplaintsError] = useState('')
+  const [updateSuccess, setUpdateSuccess] = useState('')
+  const [delayRiskRetry, setDelayRiskRetry] = useState(0)
+  const [complaintsRetry, setComplaintsRetry] = useState(0)
   
   
 
@@ -140,7 +153,26 @@ export default function MapView() {
       })
 
     return () => { cancelled = true }
-  }, [selected])
+  }, [selected, delayRiskRetry])
+
+  useEffect(() => {
+    if (!selected) {
+      setPriority(null); setPriorityError(''); setPriorityLoading(false)
+      return
+    }
+    let cancelled = false
+    setPriorityLoading(true); setPriorityError('')
+    api.get(`/api/projects/${selected.id}/priority`)
+      .then(({ data }) => { if (!cancelled) setPriority(data) })
+      .catch(() => {
+        if (!cancelled) {
+          setPriority(null)
+          setPriorityError('Priority score could not be calculated.')
+        }
+      })
+      .finally(() => { if (!cancelled) setPriorityLoading(false) })
+    return () => { cancelled = true }
+  }, [selected, priorityRetry])
 
   useEffect(() => {
     if (!selected) {
@@ -159,7 +191,7 @@ export default function MapView() {
       })
       .finally(() => { if (!cancelled) setLinkedComplaintsLoading(false) })
     return () => { cancelled = true }
-  }, [selected])
+  }, [selected, complaintsRetry])
 
   // ── WebSocket connection ─────────────────
   useEffect(() => {
@@ -300,14 +332,14 @@ export default function MapView() {
   const types = ['all', ...new Set(projects.map(p => p.projectType).filter(Boolean))]
 
   return (
-    <div style={{
+    <div className="map-page" style={{
       display: 'flex', flexDirection: 'column',
       height: 'calc(100vh - 46px)',
       margin: '-20px -24px'
     }}>
 
       {/* Toolbar */}
-      <div style={{
+      <div className="map-toolbar" style={{
         background: 'var(--bg-surface)',
         borderBottom: '1px solid var(--border)',
         padding: '8px 16px',
@@ -440,7 +472,10 @@ export default function MapView() {
             position: 'absolute', top: 16, left: '50%', transform: 'translateX(-50%)', zIndex: 1000,
             background: 'var(--red-lt)', border: '1px solid #FCA5A5', color: 'var(--red)',
             borderRadius: 'var(--r-md)', padding: '8px 12px', fontSize: 12.5
-          }}>{loadError}</div>
+          }} role="alert">
+            {loadError} <button className="btn btn-ghost btn-sm"
+              onClick={() => loadProjects(true).catch(() => {})}>Retry</button>
+          </div>
         )}
         {!loading && !loadError && wardId && projects.length === 0 && (
           <div style={{
@@ -459,10 +494,16 @@ export default function MapView() {
             </div>
           </div>
         )}
+        {!loading && !loadError && projects.length > 0 && filteredProjects.length === 0 && (
+          <div className="map-empty-overlay">
+            <div style={{ fontSize: 13, fontWeight: 500, marginBottom: 4 }}>No projects match these filters</div>
+            <button className="btn btn-sm" onClick={() => { setFilter('all'); setTypeFilter('all') }}>Clear filters</button>
+          </div>
+        )}
 
         {/* Detail panel */}
         {selected && (
-          <div style={{
+          <div className="map-detail-panel" style={{
             width: 320, flexShrink: 0,
             background: 'var(--bg-surface)',
             borderLeft: '1px solid var(--border)',
@@ -532,6 +573,32 @@ export default function MapView() {
                 </div>
               </div>
 
+              <div style={{
+                border: '1px solid var(--border)', borderRadius: 'var(--r-md)',
+                padding: '10px 12px', background: 'var(--bg-hover)'
+              }}>
+                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 6 }}>
+                  <span className="t-label">Advisory priority</span>
+                  {priorityLoading && <span className="t-caption">Calculating...</span>}
+                  {!priorityLoading && priority && (
+                    <span className="badge" style={PRIORITY_STYLE[priority.priorityLevel]}>
+                      {priority.priorityLevel}
+                    </span>
+                  )}
+                </div>
+                {priorityError ? (
+                  <div style={{ fontSize: 11.5, color: 'var(--red)' }} role="alert">
+                    {priorityError} <button className="btn btn-ghost btn-sm"
+                      onClick={() => setPriorityRetry(value => value + 1)}>Retry</button>
+                  </div>
+                ) : !priorityLoading && priority && (
+                  <>
+                    <div style={{ fontSize: 18, fontWeight: 500 }}>{priority.totalScore.toFixed(1)} / 100</div>
+                    <div className="t-caption">Decision-support score; not an official government formula.</div>
+                  </>
+                )}
+              </div>
+
               {/* Rule-based delay risk */}
               <div style={{
                 border: '1px solid var(--border)',
@@ -557,7 +624,10 @@ export default function MapView() {
                 </div>
 
                 {delayRiskError ? (
-                  <div style={{ fontSize: 11.5, color: 'var(--red)' }}>{delayRiskError}</div>
+                  <div style={{ fontSize: 11.5, color: 'var(--red)' }} role="alert">
+                    {delayRiskError} <button className="btn btn-ghost btn-sm"
+                      onClick={() => setDelayRiskRetry(value => value + 1)}>Retry</button>
+                  </div>
                 ) : !delayRiskLoading && delayRisk && (
                   <>
                     <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '6px 12px' }}>
@@ -592,7 +662,10 @@ export default function MapView() {
                 </div>
                 {linkedComplaintsLoading && <div className="t-caption">Loading linked complaints...</div>}
                 {linkedComplaintsError && (
-                  <div style={{ fontSize: 11.5, color: 'var(--red)' }}>{linkedComplaintsError}</div>
+                  <div style={{ fontSize: 11.5, color: 'var(--red)' }} role="alert">
+                    {linkedComplaintsError} <button className="btn btn-ghost btn-sm"
+                      onClick={() => setComplaintsRetry(value => value + 1)}>Retry</button>
+                  </div>
                 )}
                 {!linkedComplaintsLoading && !linkedComplaintsError && linkedComplaints.length === 0 && (
                   <div className="t-caption">No complaints are linked to this work.</div>
@@ -678,7 +751,7 @@ export default function MapView() {
                {canUpdateStatus && (
                   <button
                     className="btn btn-primary btn-sm w-full"
-                    onClick={() => setShowUpdateForm(true)}
+                    onClick={() => { setUpdateSuccess(''); setShowUpdateForm(true) }}
                   >
                     📝 Log progress update
                   </button>
@@ -696,15 +769,19 @@ export default function MapView() {
           <FieldUpdateForm
             project={selected}
             onClose={() => setShowUpdateForm(false)}
-            onUpdated={() => {
-              api.get(`/api/projects/ward/${wardId}`)
-                .then(res => setProjects(res.data))
-
+            onUpdated={({ status, photoCount }) => {
+              loadProjects(false).catch(() => {})
+              setUpdateSuccess(`Project updated to ${STATUS_LABEL[status] || status}${photoCount ? ` with ${photoCount} photo${photoCount === 1 ? '' : 's'}` : ''}.`)
               setSelectedId(null)
-              setShowUpdateForm(false)
             }}
           />
-        )}        
+        )}
+        {updateSuccess && (
+          <div className="map-success-notice" role="status">
+            <span>{updateSuccess}</span>
+            <button className="btn btn-ghost btn-sm" onClick={() => setUpdateSuccess('')}>Dismiss</button>
+          </div>
+        )}
       </div>
     </div>
   )

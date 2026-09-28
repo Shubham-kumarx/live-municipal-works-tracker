@@ -13,14 +13,15 @@ export default function Login() {
     e.preventDefault()
     setError('')
 
-    if (!form.email || !form.password) {
+    const email = form.email.trim().toLowerCase()
+    if (!email || !form.password) {
       setError('Email and password are required')
       return
     }
 
     setLoading(true)
     try {
-      const res = await api.post('/api/auth/login', form)
+      const res = await api.post('/api/auth/login', { email, password: form.password })
       localStorage.setItem('token', res.data.token)
       localStorage.setItem('user', JSON.stringify({
         email: res.data.email,
@@ -40,15 +41,14 @@ export default function Login() {
   }
 
   return (
-    <div style={{
+    <div className="auth-page" style={{
       height: '100vh',
       display: 'grid',
-      gridTemplateColumns: '1fr 420px',
       background: '#F2F1EE'
     }}>
 
       {/* Left — branding panel */}
-      <div style={{
+      <div className="auth-brand-panel" style={{
         background: '#1C1F24',
         display: 'flex',
         flexDirection: 'column',
@@ -103,7 +103,7 @@ export default function Login() {
       </div>
 
       {/* Right — login form */}
-      <div style={{
+      <div className="auth-form-panel" style={{
         display: 'flex', flexDirection: 'column',
         justifyContent: 'center', padding: '48px 40px',
         background: '#FFFFFF',
@@ -132,6 +132,7 @@ export default function Login() {
               value={form.email}
               onChange={e => setForm({ ...form, email: e.target.value })}
               autoComplete="email"
+              required
               disabled={loading}
             />
           </div>
@@ -142,10 +143,6 @@ export default function Login() {
               <label style={{ fontSize: 12, fontWeight: 500, color: '#52575E' }}>
                 Password
               </label>
-              <button type="button" className="btn btn-ghost btn-sm"
-                style={{ padding: 0, fontSize: 12, color: '#1A4B6E' }}>
-                Forgot password?
-              </button>
             </div>
             <input
               className="input"
@@ -154,13 +151,14 @@ export default function Login() {
               value={form.password}
               onChange={e => setForm({ ...form, password: e.target.value })}
               autoComplete="current-password"
+              required
               disabled={loading}
             />
           </div>
 
           {/* Error */}
           {error && (
-            <div style={{
+            <div role="alert" style={{
               padding: '8px 12px',
               background: '#FDE8E8',
               border: '1px solid #FCA5A5',

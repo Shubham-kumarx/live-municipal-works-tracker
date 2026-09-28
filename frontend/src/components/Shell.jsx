@@ -1,3 +1,4 @@
+import { useState } from 'react'
 import { Outlet, NavLink, useNavigate } from 'react-router-dom'
 import { clearSession, getSession } from '../auth/session'
 
@@ -26,6 +27,7 @@ const NAV = [
 export default function Shell() {
   const navigate = useNavigate()
   const user = getSession()?.user || {}
+  const [mobileNavOpen, setMobileNavOpen] = useState(false)
 
   function handleLogout() {
     clearSession()
@@ -34,7 +36,9 @@ export default function Shell() {
 
   return (
     <div className="shell">
-      <aside className="sidebar">
+      {mobileNavOpen && <button className="sidebar-overlay" aria-label="Close navigation"
+        onClick={() => setMobileNavOpen(false)} />}
+      <aside className={`sidebar${mobileNavOpen ? ' sidebar-open' : ''}`}>
         {/* Brand */}
         <div className="sidebar-brand">
           <div className="sidebar-brand-dot" />
@@ -54,6 +58,7 @@ export default function Shell() {
                     key={link.to}
                     to={link.to}
                     className={({ isActive }) => 'sidebar-link' + (isActive ? ' active' : '')}
+                    onClick={() => setMobileNavOpen(false)}
                   >
                     {link.icon}
                     {link.label}
@@ -66,7 +71,8 @@ export default function Shell() {
           {(user.role === 'MUNICIPAL_ADMIN' || user.role === 'WARD_OFFICER') && (
             <div>
               <div className="sidebar-section-label">Admin</div>
-              <NavLink to="/add-staff" className={({ isActive }) => 'sidebar-link' + (isActive ? ' active' : '')}>
+              <NavLink to="/add-staff" onClick={() => setMobileNavOpen(false)}
+                className={({ isActive }) => 'sidebar-link' + (isActive ? ' active' : '')}>
                 <IconUsers /> Add Team Member
               </NavLink>
             </div>
@@ -116,7 +122,11 @@ export default function Shell() {
       <div className="content-area">
         {/* Topbar */}
         <header className="topbar">
-          <div style={{ display: 'flex', flexDirection: 'column' }}>
+          <button className="btn btn-ghost btn-sm mobile-nav-toggle" aria-label="Open navigation"
+            aria-expanded={mobileNavOpen} onClick={() => setMobileNavOpen(true)}>
+            <IconMenu />
+          </button>
+          <div className="topbar-date" style={{ display: 'flex', flexDirection: 'column' }}>
             <span style={{ fontSize: 13, fontWeight: 500, color: 'var(--text-primary)' }}>
               {new Date().toLocaleDateString('en-IN', {
                 weekday: 'long', day: 'numeric',
@@ -130,7 +140,7 @@ export default function Shell() {
 
           <div style={{ marginLeft: 'auto', display: 'flex', alignItems: 'center', gap: 10 }}>
             {/* Search */}
-            <div style={{ position: 'relative' }}>
+            <div className="topbar-search" style={{ position: 'relative' }}>
               <input
                 className="input input-sm"
                 placeholder="Search work orders, complaints..."
@@ -144,7 +154,7 @@ export default function Shell() {
             </div>
 
             {/* Ward badge */}
-            <div style={{
+            <div className="topbar-ward" style={{
               fontSize: 11.5, padding: '3px 10px',
               border: '1px solid var(--border)',
               borderRadius: 'var(--r-sm)',
@@ -223,5 +233,10 @@ function IconSearch({ style }) {
 function IconBell({ style }) {
   return <svg style={style} viewBox="0 0 16 16" fill="none" stroke="currentColor" strokeWidth="1.5">
     <path d="M8 1a5 5 0 015 5v3l1 2H2l1-2V6a5 5 0 015-5zM6.5 13a1.5 1.5 0 003 0"/>
+  </svg>
+}
+function IconMenu() {
+  return <svg viewBox="0 0 16 16" width="16" height="16" fill="none" stroke="currentColor" strokeWidth="1.5">
+    <path d="M2 4h12M2 8h12M2 12h12" />
   </svg>
 }

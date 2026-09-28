@@ -106,7 +106,7 @@ export default function FieldTeams() {
   const selectedTeam = TEAMS.find(t => t.id === selected)
 
   return (
-    <div style={{ display: 'grid', gridTemplateColumns: selected ? '1fr 360px' : '1fr', gap: 16 }}>
+    <div className="field-teams-layout" style={{ display: 'grid', gridTemplateColumns: selected ? '1fr 360px' : '1fr', gap: 16 }}>
 
       {/* Left — teams table */}
       <div>
@@ -147,7 +147,7 @@ export default function FieldTeams() {
         </div>
 
         {/* Teams table */}
-        <div className="panel">
+        <div className="panel operational-table">
           <table className="data-table">
             <thead>
               <tr>

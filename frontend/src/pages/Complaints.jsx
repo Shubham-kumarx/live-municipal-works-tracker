@@ -42,6 +42,12 @@ export default function Complaints() {
       setImage(null)
       return
     }
+    if (file.size === 0) {
+      setError('Choose a non-empty image file.')
+      event.target.value = ''
+      setImage(null)
+      return
+    }
     if (!['image/jpeg', 'image/png'].includes(file.type)) {
       setError('Choose a JPEG or PNG image.')
       event.target.value = ''
@@ -103,6 +109,10 @@ export default function Complaints() {
       setError('Add an image, description, and location before submitting.')
       return
     }
+    if (description.trim().length > 2000 || locationAddress.trim().length > 255) {
+      setError('Description or location exceeds the allowed length.')
+      return
+    }
     const aiFields = analysis ? {
       aiPredictedIssueType: analysis.candidateIssueType,
       aiConfidence: analysis.confidence,
@@ -146,6 +156,15 @@ export default function Complaints() {
     }
   }
 
+  function handlePreviewError() {
+    setError('The selected image could not be previewed. Choose another JPEG or PNG image.')
+    setImage(null)
+    setAnalysis(null)
+    if (fileInput.current) fileInput.current.value = ''
+  }
+
+  const canSubmit = image && description.trim() && locationAddress.trim() && !submitting && !analyzing
+
   return (
     <div className="complaint-page">
       <div className="page-header">
@@ -162,9 +181,10 @@ export default function Complaints() {
         </div>
         <div className="panel-body">
           <label className="complaint-upload">
-            <input ref={fileInput} type="file" accept="image/jpeg,image/png" onChange={selectImage} />
+            <input ref={fileInput} type="file" accept="image/jpeg,image/png" onChange={selectImage}
+              disabled={analyzing || submitting} />
             {previewUrl ? (
-              <img src={previewUrl} alt="Selected municipal issue" />
+              <img src={previewUrl} alt="Selected municipal issue" onError={handlePreviewError} />
             ) : (
               <span>Select a photo of the issue</span>
             )}
@@ -178,7 +198,7 @@ export default function Complaints() {
               }}>Remove</button>
             </div>
           )}
-          {error && <div className="complaint-message complaint-error">{error}</div>}
+          {error && <div className="complaint-message complaint-error" role="alert">{error}</div>}
           <div className="complaint-actions">
             <button type="button" className="btn btn-primary" disabled={!image || analyzing} onClick={analyzeImage}>
               {analyzing ? 'Analyzing…' : 'Analyze image'}
@@ -229,13 +249,13 @@ export default function Complaints() {
         <div className="panel-body complaint-form-grid">
           <label className="complaint-form-wide">
             <span className="t-label">Description</span>
-            <textarea className="input complaint-textarea" maxLength={2000} value={description}
+            <textarea className="input complaint-textarea" maxLength={2000} required value={description}
               onChange={event => setDescription(event.target.value)}
               placeholder="Describe what is visible and how it affects the area" />
           </label>
           <label className="complaint-form-wide">
             <span className="t-label">Location</span>
-            <input className="input" maxLength={255} value={locationAddress}
+            <input className="input" maxLength={255} required value={locationAddress}
               onChange={event => setLocationAddress(event.target.value)}
               placeholder="Street, landmark, or nearby address" />
           </label>
@@ -259,13 +279,13 @@ export default function Complaints() {
           </label>
           <div className="complaint-form-wide complaint-submit-row">
             <span className="t-caption">Your confirmed values are saved separately from the AI suggestion.</span>
-            <button type="button" className="btn btn-primary" disabled={submitting} onClick={submitComplaint}>
+            <button type="button" className="btn btn-primary" disabled={!canSubmit} onClick={submitComplaint}>
               {submitting ? 'Submitting…' : 'Submit complaint'}
             </button>
           </div>
         </div>
       </div>
-      {submittedId && <div className="complaint-message complaint-success">Complaint #{submittedId} was submitted.</div>}
+      {submittedId && <div className="complaint-message complaint-success" role="status">Complaint #{submittedId} was submitted.</div>}
     </div>
   )
 }

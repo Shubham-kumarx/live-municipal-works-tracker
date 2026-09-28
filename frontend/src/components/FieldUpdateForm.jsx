@@ -1,6 +1,10 @@
 import { useState, useRef } from 'react'
 import api from '../api/axios'
 
+const MAX_PHOTO_BYTES = 10 * 1024 * 1024
+const MAX_PHOTOS = 3
+const ACCEPTED_PHOTO_TYPES = ['image/jpeg', 'image/png']
+
 export default function FieldUpdateForm({ project, onClose, onUpdated }) {
   const [status, setStatus] = useState(project.status)
   const [progress, setProgress] = useState(project.progressPercentage || 0)
@@ -45,12 +49,27 @@ export default function FieldUpdateForm({ project, onClose, onUpdated }) {
   // Handle photo selection
   function handlePhotoChange(e) {
     const files = Array.from(e.target.files)
+    setError('')
+    if (photos.length + files.length > MAX_PHOTOS) {
+      setError(`Upload no more than ${MAX_PHOTOS} photos per update.`)
+      e.target.value = ''
+      return
+    }
+    const invalid = files.find(file => file.size === 0
+      || file.size > MAX_PHOTO_BYTES || !ACCEPTED_PHOTO_TYPES.includes(file.type))
+    if (invalid) {
+      setError('Each photo must be a non-empty JPEG or PNG no larger than 10 MB.')
+      e.target.value = ''
+      return
+    }
     files.forEach(file => {
       const reader = new FileReader()
       const id = crypto.randomUUID()
       reader.onload = ev => setPhotos(prev => [...prev, { id, file, preview: ev.target.result }])
+      reader.onerror = () => setError(`Photo ${file.name} could not be read.`)
       reader.readAsDataURL(file)
     })
+    e.target.value = ''
   }
 
   function removePhoto(index) {
@@ -60,6 +79,14 @@ export default function FieldUpdateForm({ project, onClose, onUpdated }) {
   async function handleSubmit(e) {
     e.preventDefault()
     setError('')
+    if (progress < 0 || progress > 100) {
+      setError('Progress must be between 0 and 100.')
+      return
+    }
+    if (note.trim().length > 5000) {
+      setError('Progress note must not exceed 5,000 characters.')
+      return
+    }
     setSubmitting(true)
     let saved = statusSaved
 
@@ -86,7 +113,7 @@ export default function FieldUpdateForm({ project, onClose, onUpdated }) {
         )
       }
 
-      onUpdated()
+      onUpdated({ status, photoCount: photos.length })
       onClose()
     } catch (err) {
       setError(saved
@@ -126,7 +153,7 @@ export default function FieldUpdateForm({ project, onClose, onUpdated }) {
               {project.projectName}
             </div>
           </div>
-          <button className="btn btn-ghost btn-sm" onClick={onClose}>✕</button>
+          <button className="btn btn-ghost btn-sm" onClick={onClose} disabled={submitting}>✕</button>
         </div>
 
         <form onSubmit={handleSubmit} style={{ padding: 20, display: 'flex', flexDirection: 'column', gap: 18 }}>
@@ -191,7 +218,11 @@ export default function FieldUpdateForm({ project, onClose, onUpdated }) {
             <select
               className="input"
               value={status}
-              onChange={e => setStatus(e.target.value)}
+              onChange={e => {
+                setStatus(e.target.value)
+                if (e.target.value === 'COMPLETED') setProgress(100)
+              }}
+              disabled={submitting || statusSaved}
             >
               {allowedStatuses.map(value => (
                 <option key={value} value={value}>
@@ -218,6 +249,7 @@ export default function FieldUpdateForm({ project, onClose, onUpdated }) {
               min={0} max={100} step={5}
               value={progress}
               onChange={e => setProgress(Number(e.target.value))}
+              disabled={submitting || statusSaved || status === 'COMPLETED'}
               style={{ width: '100%', accentColor: 'var(--accent)' }}
             />
             <div style={{
@@ -252,6 +284,8 @@ export default function FieldUpdateForm({ project, onClose, onUpdated }) {
               placeholder="Describe what was done today, any issues faced..."
               value={note}
               onChange={e => setNote(e.target.value)}
+              maxLength={5000}
+              disabled={submitting || statusSaved}
               rows={3}
               style={{ height: 'auto', resize: 'vertical', padding: '8px 10px' }}
             />
@@ -272,6 +306,7 @@ export default function FieldUpdateForm({ project, onClose, onUpdated }) {
               multiple
               style={{ display: 'none' }}
               onChange={handlePhotoChange}
+              disabled={submitting}
             />
 
             {/* Upload button */}
@@ -279,13 +314,14 @@ export default function FieldUpdateForm({ project, onClose, onUpdated }) {
               type="button"
               className="btn btn-sm"
               onClick={() => fileRef.current.click()}
+              disabled={submitting || photos.length >= MAX_PHOTOS}
               style={{ width: '100%', justifyContent: 'center', padding: '8px 0' }}
             >
               📷 Take photo / Upload from gallery
             </button>
 
             <div style={{ fontSize: 11, color: 'var(--text-muted)', marginTop: 5 }}>
-              On mobile, opens camera directly. On desktop, opens file picker.
+              JPEG or PNG, up to 10 MB each. Maximum {MAX_PHOTOS} photos.
             </div>
 
             {/* Photo previews */}
@@ -347,6 +383,7 @@ export default function FieldUpdateForm({ project, onClose, onUpdated }) {
               type="button"
               className="btn btn-sm"
               onClick={onClose}
+              disabled={submitting}
               style={{ flex: 1 }}
             >
               Cancel

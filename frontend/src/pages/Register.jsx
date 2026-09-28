@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react'
+import { useCallback, useEffect, useState } from 'react'
 import { useNavigate, Link } from 'react-router-dom'
 import api from '../api/axios'
 import { landingPath } from '../auth/session'
@@ -21,15 +21,27 @@ export default function Register() {
     fullName: '', email: '', password: '', phone: '', wardId: ''
   })
   const [error, setError] = useState('')
+  const [wardsLoading, setWardsLoading] = useState(true)
+  const [wardsError, setWardsError] = useState('')
   const [loading, setLoading] = useState(false)
   const [detectingLocation, setDetectingLocation] = useState(false)
   const [detectedWardName, setDetectedWardName] = useState('')
 
-  useEffect(() => {
-    api.get('/api/wards')
-      .then(res => setWards(res.data))
-      .catch(() => setError('Wards could not be loaded. Please refresh and try again.'))
+  const loadWards = useCallback(async () => {
+    setWardsLoading(true)
+    setWardsError('')
+    try {
+      const response = await api.get('/api/wards')
+      setWards(response.data)
+    } catch {
+      setWards([])
+      setWardsError('Wards could not be loaded.')
+    } finally {
+      setWardsLoading(false)
+    }
   }, [])
+
+  useEffect(() => { loadWards() }, [loadWards])
 function detectNearestWard() {
   setDetectingLocation(true)
   setDetectedWardName('')
@@ -68,7 +80,10 @@ function detectNearestWard() {
     e.preventDefault()
     setError('')
 
-    if (!form.fullName || !form.email || !form.password || !form.phone || !form.wardId) {
+    const fullName = form.fullName.trim()
+    const email = form.email.trim().toLowerCase()
+    const phone = form.phone.replace(/[\s()-]/g, '')
+    if (!fullName || !email || !form.password || !phone || !form.wardId) {
       setError('All fields are required')
       return
     }
@@ -76,11 +91,15 @@ function detectNearestWard() {
       setError('Password must be at least 6 characters')
       return
     }
+    if (!/^\d{10}$/.test(phone)) {
+      setError('Enter a valid 10-digit mobile number')
+      return
+    }
 
     setLoading(true)
     try {
       const res = await api.post('/api/auth/register', {
-        ...form,
+        ...form, fullName, email, phone,
         wardId: Number(form.wardId),
       })
       localStorage.setItem('token', res.data.token)
@@ -99,11 +118,11 @@ function detectNearestWard() {
   }
 
   return (
-    <div style={{
+    <div className="auth-page" style={{
       height: '100vh', display: 'grid',
-      gridTemplateColumns: '1fr 420px', background: '#F2F1EE'
+      background: '#F2F1EE'
     }}>
-      <div style={{
+      <div className="auth-brand-panel" style={{
         background: '#1C1F24', display: 'flex', flexDirection: 'column',
         padding: '48px 56px', justifyContent: 'center'
       }}>
@@ -120,7 +139,7 @@ function detectNearestWard() {
         </div>
       </div>
 
-      <div style={{
+      <div className="auth-form-panel" style={{
         display: 'flex', flexDirection: 'column', justifyContent: 'center',
         padding: '48px 40px', background: '#FFFFFF', borderLeft: '1px solid #E2E0DB',
         overflowY: 'auto'
@@ -142,6 +161,7 @@ function detectNearestWard() {
             <input className="input" placeholder="Your full name"
               value={form.fullName}
               onChange={e => setForm({ ...form, fullName: e.target.value })}
+              required
               disabled={loading} />
           </div>
 
@@ -152,6 +172,7 @@ function detectNearestWard() {
             <input className="input" type="email" placeholder="you@example.com"
               value={form.email}
               onChange={e => setForm({ ...form, email: e.target.value })}
+              required
               disabled={loading} />
           </div>
 
@@ -162,6 +183,7 @@ function detectNearestWard() {
             <input className="input" placeholder="10-digit mobile number"
               value={form.phone}
               onChange={e => setForm({ ...form, phone: e.target.value })}
+              inputMode="numeric" maxLength={14} required
               disabled={loading} />
           </div>
 
@@ -174,11 +196,21 @@ function detectNearestWard() {
               type="button"
               className="btn btn-sm"
               onClick={detectNearestWard}
-              disabled={detectingLocation || wards.length === 0}
+              disabled={detectingLocation || wardsLoading || wards.length === 0}
               style={{ width: '100%', justifyContent: 'center', padding: '7px 0', marginBottom: 8 }}
             >
               {detectingLocation ? '📡 Detecting your location...' : '📍 Use my current location'}
             </button>
+
+            {wardsLoading && <div className="t-caption" style={{ marginBottom: 8 }}>Loading wards...</div>}
+            {!wardsLoading && wardsError && (
+              <div className="complaint-message complaint-error" role="alert" style={{ marginBottom: 8 }}>
+                {wardsError} <button type="button" className="btn btn-ghost btn-sm" onClick={loadWards}>Retry</button>
+              </div>
+            )}
+            {!wardsLoading && !wardsError && wards.length === 0 && (
+              <div className="t-caption" style={{ marginBottom: 8 }}>No wards are currently available.</div>
+            )}
 
             {detectedWardName && (
               <div style={{ fontSize: 11.5, color: 'var(--green)', marginBottom: 8 }}>
@@ -188,7 +220,7 @@ function detectNearestWard() {
 
             <select className="input" value={form.wardId}
               onChange={e => setForm({ ...form, wardId: e.target.value })}
-              disabled={loading}>
+              disabled={loading || wardsLoading || Boolean(wardsError)} required>
               <option value="">Select your ward</option>
               {wards.map(w => (
                 <option key={w.id} value={w.id}>
@@ -205,11 +237,12 @@ function detectNearestWard() {
             <input className="input" type="password" placeholder="At least 6 characters"
               value={form.password}
               onChange={e => setForm({ ...form, password: e.target.value })}
+              minLength={6} required
               disabled={loading} />
           </div>
 
           {error && (
-            <div style={{
+            <div role="alert" style={{
               padding: '8px 12px', background: '#FDE8E8',
               border: '1px solid #FCA5A5', borderRadius: 'var(--r-md)',
               fontSize: 12.5, color: '#8B1C1C'
@@ -218,7 +251,7 @@ function detectNearestWard() {
             </div>
           )}
 
-          <button type="submit" className="btn btn-primary" disabled={loading}
+          <button type="submit" className="btn btn-primary" disabled={loading || wardsLoading || Boolean(wardsError) || wards.length === 0}
             style={{ width: '100%', justifyContent: 'center', padding: '8px 0', fontSize: 13.5, marginTop: 4 }}>
             {loading ? 'Creating account...' : 'Create account'}
           </button>
