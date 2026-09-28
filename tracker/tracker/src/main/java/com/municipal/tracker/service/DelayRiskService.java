@@ -29,6 +29,12 @@ public class DelayRiskService {
                 .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND,
                         "Project not found: " + projectId));
 
+        return calculate(project, calculationDate, calculatedAt);
+    }
+
+    public Calculation calculate(MunicipalProject project, LocalDate calculationDate,
+                                 LocalDateTime calculatedAt) {
+
         Double actualProgress = project.getProgressPercentage() == null
                 ? null : clamp(project.getProgressPercentage().doubleValue());
         if (project.getStatus() == ProjectStatus.COMPLETED) {

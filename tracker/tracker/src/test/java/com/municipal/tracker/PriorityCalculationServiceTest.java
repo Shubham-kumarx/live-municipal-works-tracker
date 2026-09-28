@@ -70,6 +70,22 @@ class PriorityCalculationServiceTest {
     }
 
     @Test
+    void calculatesFromAnAlreadyLoadedProjectAndComplaints() {
+        LocalDate date = LocalDate.of(2026, 9, 27);
+        MunicipalProject project = project(9L);
+        project.setImpactLevel(ProjectImpactLevel.MEDIUM);
+        Complaint complaint = new Complaint();
+        complaint.setFinalSeverity(ComplaintSeverity.HIGH);
+
+        PriorityCalculationService.Calculation result = service.calculate(
+                project, List.of(complaint), date, LocalDateTime.of(2026, 9, 27, 12, 0));
+
+        assertThat(result.project()).isSameAs(project);
+        assertThat(result.factors()).hasSize(5);
+        assertThat(result.totalScore()).isBetween(0.0, 100.0);
+    }
+
+    @Test
     void unknownProjectReturnsNotFound() {
         when(projects.findById(99L)).thenReturn(Optional.empty());
 

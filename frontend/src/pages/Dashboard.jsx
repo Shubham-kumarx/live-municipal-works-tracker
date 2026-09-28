@@ -1,252 +1,296 @@
-
-import { useState, useEffect } from 'react'
+import { useCallback, useEffect, useState } from 'react'
 import api from '../api/axios'
-import { getSession } from '../auth/session'
 
-const WORK_ORDERS = [
-  { id: 'MW-2026-01842', title: 'Pothole repair near Sector 14 market', location: 'Sector 14, Block B', ward: 'W-014', dept: 'Roads', priority: 'high', worker: 'Zone B Road Crew', status: 'in_progress', due: 'Aug 15', progress: 62 },
-  { id: 'MW-2026-01839', title: 'Streetlight outage — 12 poles on Avenue 4', location: 'Avenue 4, Rohini', ward: 'W-014', dept: 'Electrical', priority: 'high', worker: 'Suresh Electricals', status: 'overdue', due: 'Aug 10', progress: 35 },
-  { id: 'MW-2026-01835', title: 'Drainage blockage causing waterlogging', location: 'Sector 7, Near School', ward: 'W-014', dept: 'Drainage', priority: 'critical', worker: 'Unassigned', status: 'pending', due: 'Aug 14', progress: 0 },
-  { id: 'MW-2026-01831', title: 'Garbage collection missed — 3 days overdue', location: 'Block C, Sector 9', ward: 'W-014', dept: 'Sanitation', priority: 'med', worker: 'Team C Sanitation', status: 'overdue', due: 'Aug 12', progress: 20 },
-  { id: 'MW-2026-01828', title: 'Water supply pipe burst — Sector 3', location: 'Sector 3, Main Road', ward: 'W-014', dept: 'Water Supply', priority: 'critical', worker: 'Anil Kumar Crew', status: 'in_progress', due: 'Aug 16', progress: 44 },
-  { id: 'MW-2026-01820', title: 'Footpath repair near bus stand', location: 'Bus Stand Road, Sec 11', ward: 'W-014', dept: 'Roads', priority: 'low', worker: 'Zone A Road Crew', status: 'done', due: 'Aug 13', progress: 100 },
-  { id: 'MW-2026-01818', title: 'Park boundary wall repair', location: 'Sector 5 Park', ward: 'W-014', dept: 'Horticulture', priority: 'low', worker: 'Park Maintenance Team', status: 'done', due: 'Aug 13', progress: 100 },
-]
-
-const COMPLAINTS = [
-  { id: 'CMP-4821', text: 'Large pothole causing accidents near school gate', location: 'Sec 14 School Road', time: '2h ago', priority: 'critical' },
-  { id: 'CMP-4820', text: 'Open manhole uncovered since 3 days', location: 'Block A, Sec 8', time: '4h ago', priority: 'high' },
-  { id: 'CMP-4819', text: 'Stray animal menace near residential block', location: 'Pocket 4, Sec 7', time: '5h ago', priority: 'med' },
-  { id: 'CMP-4817', text: 'Illegal construction blocking public drain', location: 'Sec 12, Lane 3', time: '8h ago', priority: 'high' },
-]
-
-function statusBadge(s) {
-  if (s === 'in_progress') return <span className="badge badge-ip">In Progress</span>
-  if (s === 'overdue')     return <span className="badge badge-late">Overdue</span>
-  if (s === 'pending')     return <span className="badge badge-pend">Pending</span>
-  if (s === 'done')        return <span className="badge badge-done">Completed</span>
-  return null
+function Kpi({ value, label, detail, tone }) {
+  return (
+    <div className="kpi-cell">
+      <div className="kpi-val" style={{ color: `var(--${tone})` }}>{value}</div>
+      <div className="kpi-label">{label}</div>
+      <div className="kpi-sub">{detail}</div>
+    </div>
+  )
 }
 
-function priBadge(p) {
-  if (p === 'critical') return <span className="badge badge-late">Critical</span>
-  if (p === 'high')     return <span className="badge badge-pri-high">High</span>
-  if (p === 'med')      return <span className="badge badge-pri-med">Medium</span>
-  if (p === 'low')      return <span className="badge badge-pri-low">Low</span>
-  return null
+function formatEnum(value) {
+  if (!value) return 'Unavailable'
+  return value.toLowerCase().replaceAll('_', ' ').replace(/\b\w/g, letter => letter.toUpperCase())
+}
+
+function formatDate(value) {
+  if (!value) return 'No deadline'
+  return new Intl.DateTimeFormat(undefined, { dateStyle: 'medium' }).format(new Date(`${value}T00:00:00`))
+}
+
+function decisionBadge(value) {
+  const className = ['CRITICAL', 'HIGH', 'HIGH_DELAY_RISK', 'DELAYED'].includes(value)
+    ? 'badge-late'
+    : value === 'COMPLETED' || value === 'ON_TRACK'
+      ? 'badge-done'
+      : value === 'IN_PROGRESS'
+        ? 'badge-ip'
+        : 'badge-pend'
+  return <span className={`badge ${className}`}>{formatEnum(value)}</span>
+}
+
+function WorkDecisionTable({ title, works, emptyMessage, showRisk = false }) {
+  return (
+    <div className="panel dashboard-decision-panel">
+      <div className="panel-header">
+        <span className="t-strong">{title}</span>
+        <span className="badge badge-sanc">{works.length}</span>
+      </div>
+      {works.length === 0 ? (
+        <div className="dashboard-empty">{emptyMessage}</div>
+      ) : (
+        <div className="dashboard-table-scroll">
+          <table className="data-table">
+            <thead>
+              <tr>
+                <th>Work</th><th>Location</th><th>Priority</th>
+                {showRisk && <th>Delay risk</th>}
+                <th>Deadline</th><th>Progress</th>
+              </tr>
+            </thead>
+            <tbody>
+              {works.map(work => (
+                <tr key={work.id}>
+                  <td>
+                    <div className="dashboard-primary">{work.projectName}</div>
+                    <div className="t-caption">#{work.id} · {formatEnum(work.status)}</div>
+                  </td>
+                  <td>{work.locationAddress || 'Not provided'}</td>
+                  <td>{decisionBadge(work.priorityLevel)} <span className="t-caption">{work.priorityScore.toFixed(1)}</span></td>
+                  {showRisk && <td>{decisionBadge(work.delayRisk)}</td>}
+                  <td>{formatDate(work.expectedEndDate)}</td>
+                  <td>{work.progressPercentage ?? 0}%</td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
+      )}
+    </div>
+  )
+}
+
+function DistributionChart({ title, items }) {
+  const total = items.reduce((sum, item) => sum + item.count, 0)
+  return (
+    <div className="panel dashboard-distribution">
+      <div className="panel-header"><span className="t-strong">{title}</span></div>
+      <div className="dashboard-distribution-body">
+        {items.map(item => {
+          const percentage = total === 0 ? 0 : (item.count / total) * 100
+          return (
+            <div key={item.label} className="dashboard-distribution-row">
+              <div className="dashboard-distribution-label">
+                <span>{formatEnum(item.label)}</span><span>{item.count}</span>
+              </div>
+              <div className="dashboard-distribution-track" aria-label={`${formatEnum(item.label)} ${item.count}`}>
+                <div className="dashboard-distribution-fill" style={{ width: `${percentage}%` }} />
+              </div>
+            </div>
+          )
+        })}
+      </div>
+    </div>
+  )
 }
 
 export default function Dashboard() {
-  const [filter, setFilter] = useState('all')
-  useEffect(() => {
-      const user = getSession()?.user || {}
-      if (user.wardId) {
-        api.get(`/api/projects/ward/${user.wardId}/stats`)
-          .then(res => console.log('Real stats:', res.data))
-          .catch(err => console.log('Stats error:', err))
-      }
-    }, [])
-  const active    = WORK_ORDERS.filter(w => w.status === 'in_progress').length
-  const overdue   = WORK_ORDERS.filter(w => w.status === 'overdue').length
-  const doneToday = WORK_ORDERS.filter(w => w.status === 'done').length
-  const critical  = COMPLAINTS.filter(c => c.priority === 'critical' || c.priority === 'high').length
+  const [dashboard, setDashboard] = useState(null)
+  const [loading, setLoading] = useState(true)
+  const [error, setError] = useState('')
+  const [filters, setFilters] = useState({
+    priority: '', delayRisk: '', status: '', severity: '', issueType: '',
+    location: '', deadline: '', workSort: 'priority', complaintSort: 'newest',
+  })
 
-  const filtered = filter === 'all'
-    ? WORK_ORDERS
-    : WORK_ORDERS.filter(w => w.status === filter)
+  const loadDashboard = useCallback(async () => {
+    setLoading(true)
+    setError('')
+    try {
+      const response = await api.get('/api/dashboard')
+      setDashboard(response.data)
+    } catch (requestError) {
+      setDashboard(null)
+      setError(requestError.response?.data?.message || 'Dashboard data could not be loaded.')
+    } finally {
+      setLoading(false)
+    }
+  }, [])
+
+  useEffect(() => {
+    loadDashboard()
+  }, [loadDashboard])
+
+  if (loading) {
+    return <div className="panel dashboard-state">Loading dashboard data...</div>
+  }
+
+  if (error) {
+    return (
+      <div className="panel dashboard-state">
+        <div>{error}</div>
+        <button className="btn btn-primary btn-sm" onClick={loadDashboard}>Retry</button>
+      </div>
+    )
+  }
+
+  if (!dashboard) {
+    return <div className="panel dashboard-state">No dashboard data is available.</div>
+  }
+
+  const { workMetrics, complaintMetrics } = dashboard
+  const today = new Date()
+  today.setHours(0, 0, 0, 0)
+  const deadlineMatches = work => {
+    if (!filters.deadline) return true
+    if (!work.expectedEndDate) return filters.deadline === 'NONE'
+    const deadline = new Date(`${work.expectedEndDate}T00:00:00`)
+    const days = Math.ceil((deadline - today) / 86400000)
+    if (filters.deadline === 'OVERDUE') return days < 0 && work.status !== 'COMPLETED'
+    if (filters.deadline === '7_DAYS') return days >= 0 && days <= 7
+    if (filters.deadline === '30_DAYS') return days >= 0 && days <= 30
+    return false
+  }
+  const priorityRank = { CRITICAL: 4, HIGH: 3, MEDIUM: 2, LOW: 1 }
+  const severityRank = { CRITICAL: 4, HIGH: 3, MEDIUM: 2, LOW: 1 }
+  const filteredWorks = dashboard.works
+    .filter(work => !filters.priority || work.priorityLevel === filters.priority)
+    .filter(work => !filters.delayRisk || (filters.delayRisk === 'UNAVAILABLE'
+      ? !work.delayRiskAvailable : work.delayRisk === filters.delayRisk))
+    .filter(work => !filters.status || work.status === filters.status)
+    .filter(work => !filters.location
+      || work.locationAddress?.toLowerCase().includes(filters.location.toLowerCase()))
+    .filter(deadlineMatches)
+    .toSorted((a, b) => {
+      if (filters.workSort === 'deadline') {
+        return (a.expectedEndDate || '9999-12-31').localeCompare(b.expectedEndDate || '9999-12-31')
+      }
+      if (filters.workSort === 'progress') return (a.progressPercentage ?? 0) - (b.progressPercentage ?? 0)
+      if (filters.workSort === 'status') return a.status.localeCompare(b.status)
+      return priorityRank[b.priorityLevel] - priorityRank[a.priorityLevel] || b.priorityScore - a.priorityScore
+    })
+  const filteredComplaints = dashboard.recentComplaints
+    .filter(complaint => !filters.severity || complaint.severity === filters.severity)
+    .filter(complaint => !filters.issueType || complaint.issueType === filters.issueType)
+    .filter(complaint => !filters.location
+      || complaint.locationAddress?.toLowerCase().includes(filters.location.toLowerCase()))
+    .toSorted((a, b) => filters.complaintSort === 'severity'
+      ? severityRank[b.severity] - severityRank[a.severity]
+      : new Date(b.createdAt) - new Date(a.createdAt))
+  const highPriorityWorks = filteredWorks
+    .filter(work => ['HIGH', 'CRITICAL'].includes(work.priorityLevel))
+    .toSorted((a, b) => b.priorityScore - a.priorityScore)
+  const highDelayRiskWorks = filteredWorks
+    .filter(work => work.delayRisk === 'HIGH_DELAY_RISK')
+    .toSorted((a, b) => (b.progressGap ?? 0) - (a.progressGap ?? 0))
+  const updateFilter = event => setFilters(current => ({ ...current, [event.target.name]: event.target.value }))
+  const resetFilters = () => setFilters({
+    priority: '', delayRisk: '', status: '', severity: '', issueType: '',
+    location: '', deadline: '', workSort: 'priority', complaintSort: 'newest',
+  })
 
   return (
-    <div>
-      {/* Page header */}
+    <div className="dashboard-page">
       <div className="page-header">
         <div className="page-header-left">
           <h1 className="t-page">Operations Overview</h1>
-          <span className="t-caption">Sample operational data · not live municipal records</span>
+          <span className="t-caption">
+            Live municipal records · generated {new Date(dashboard.generatedAt).toLocaleString()}
+          </span>
         </div>
-        <div className="flex-center gap-8">
-          <button className="btn btn-sm">Export report</button>
-          <button className="btn btn-primary btn-sm">+ New work order</button>
+        <button className="btn btn-sm" onClick={loadDashboard}>Refresh</button>
+      </div>
+
+      <div className="kpi-strip dashboard-kpis">
+        <Kpi value={workMetrics.total} label="Total work" detail="all work records" tone="blue" />
+        <Kpi value={workMetrics.active} label="Active" detail="currently in progress" tone="blue" />
+        <Kpi value={workMetrics.completed} label="Completed" detail="completed work" tone="green" />
+        <Kpi value={workMetrics.delayed} label="Delayed" detail="marked delayed" tone="red" />
+        <Kpi value={workMetrics.highPriority} label="High priority" detail="high or critical score" tone="red" />
+        <Kpi value={workMetrics.highDelayRisk} label="High delay risk" detail="rule-based assessment" tone="red" />
+        <Kpi value={complaintMetrics.total} label="Complaints" detail="all complaints" tone="blue" />
+        <Kpi value={complaintMetrics.unresolved} label="Unresolved" detail="awaiting resolution" tone="amber" />
+        <Kpi value={complaintMetrics.aiAssisted} label="AI assisted" detail="included an AI prediction" tone="green" />
+      </div>
+
+      <div className="panel dashboard-filter-panel">
+        <div className="panel-header">
+          <span className="t-strong">Dashboard Filters</span>
+          <button className="btn btn-ghost btn-sm" onClick={resetFilters}>Reset</button>
+        </div>
+        <div className="dashboard-filter-grid">
+          <label><span className="t-label">Priority</span><select className="input" name="priority" value={filters.priority} onChange={updateFilter}>
+            <option value="">All priorities</option><option>CRITICAL</option><option>HIGH</option><option>MEDIUM</option><option>LOW</option>
+          </select></label>
+          <label><span className="t-label">Delay risk</span><select className="input" name="delayRisk" value={filters.delayRisk} onChange={updateFilter}>
+            <option value="">All risk levels</option><option>HIGH_DELAY_RISK</option><option>AT_RISK</option><option>ON_TRACK</option><option>UNAVAILABLE</option>
+          </select></label>
+          <label><span className="t-label">Work status</span><select className="input" name="status" value={filters.status} onChange={updateFilter}>
+            <option value="">All statuses</option><option>SANCTIONED</option><option>IN_PROGRESS</option><option>DELAYED</option><option>COMPLETED</option><option>CANCELLED</option>
+          </select></label>
+          <label><span className="t-label">Complaint severity</span><select className="input" name="severity" value={filters.severity} onChange={updateFilter}>
+            <option value="">All severities</option><option>CRITICAL</option><option>HIGH</option><option>MEDIUM</option><option>LOW</option>
+          </select></label>
+          <label><span className="t-label">Issue type</span><select className="input" name="issueType" value={filters.issueType} onChange={updateFilter}>
+            <option value="">All issue types</option><option>POTHOLE</option><option>ROAD_CRACK</option><option>GARBAGE_ACCUMULATION</option><option>WATERLOGGING</option><option>DAMAGED_STREETLIGHT</option><option>OPEN_MANHOLE</option><option>OTHER</option>
+          </select></label>
+          <label><span className="t-label">Deadline</span><select className="input" name="deadline" value={filters.deadline} onChange={updateFilter}>
+            <option value="">All deadlines</option><option value="OVERDUE">Overdue</option><option value="7_DAYS">Due within 7 days</option><option value="30_DAYS">Due within 30 days</option><option value="NONE">No deadline</option>
+          </select></label>
+          <label><span className="t-label">Location</span><input className="input" name="location" value={filters.location} onChange={updateFilter} placeholder="Search location" /></label>
+          <label><span className="t-label">Work sorting</span><select className="input" name="workSort" value={filters.workSort} onChange={updateFilter}>
+            <option value="priority">Priority</option><option value="deadline">Deadline</option><option value="progress">Lowest progress</option><option value="status">Status</option>
+          </select></label>
+          <label><span className="t-label">Complaint sorting</span><select className="input" name="complaintSort" value={filters.complaintSort} onChange={updateFilter}>
+            <option value="newest">Newest</option><option value="severity">Severity</option>
+          </select></label>
         </div>
       </div>
 
-      {/* KPI strip */}
-      <div className="kpi-strip" style={{ marginBottom: 20 }}>
-        <div className="kpi-cell">
-          <div className="kpi-val" style={{ color: 'var(--blue)' }}>{active}</div>
-          <div className="kpi-label">Active work</div>
-          <div className="kpi-sub">currently in progress</div>
-        </div>
-        <div className="kpi-cell">
-          <div className="kpi-val" style={{ color: 'var(--red)' }}>{overdue}</div>
-          <div className="kpi-label">Overdue</div>
-          <div className="kpi-sub">past due date</div>
-        </div>
-        <div className="kpi-cell">
-          <div className="kpi-val" style={{ color: 'var(--green)' }}>{doneToday}</div>
-          <div className="kpi-label">Sample completed count</div>
-          <div className="kpi-sub">Demonstration value</div>
-        </div>
-        <div className="kpi-cell">
-          <div className="kpi-val" style={{ color: 'var(--red)' }}>{critical}</div>
-          <div className="kpi-label">Critical complaints</div>
-          <div className="kpi-sub">need immediate attention</div>
-        </div>
+      <WorkDecisionTable title="Filtered Work Register" works={filteredWorks}
+        emptyMessage="No work matches the selected filters." showRisk />
+
+      <div className="dashboard-decision-grid">
+        <WorkDecisionTable title="High Priority Works" works={highPriorityWorks}
+          emptyMessage="No high-priority work is currently in scope." />
+        <WorkDecisionTable title="High Delay-Risk Works" works={highDelayRiskWorks}
+          emptyMessage="No work currently has high delay risk." showRisk />
       </div>
 
-      {/* Main grid */}
-      <div style={{ display: 'grid', gridTemplateColumns: '1fr 320px', gap: 16 }}>
-
-        {/* Work orders table */}
-        <div className="panel">
-          <div className="panel-header">
-            <span className="t-strong">Priority Work Queue</span>
-            <div className="flex-center gap-8">
-              {/* Filter tabs */}
-              <div style={{ display: 'flex', border: '1px solid var(--border)', borderRadius: 'var(--r-md)', overflow: 'hidden' }}>
-                {[
-                  { key: 'all', label: 'All' },
-                  { key: 'in_progress', label: 'Active' },
-                  { key: 'overdue', label: 'Overdue' },
-                  { key: 'pending', label: 'Pending' },
-                ].map(f => (
-                  <button
-                    key={f.key}
-                    onClick={() => setFilter(f.key)}
-                    style={{
-                      padding: '3px 10px',
-                      fontSize: 11.5,
-                      border: 'none',
-                      borderRight: '1px solid var(--border)',
-                      background: filter === f.key ? 'var(--accent)' : 'var(--bg-surface)',
-                      color: filter === f.key ? '#fff' : 'var(--text-secondary)',
-                      cursor: 'pointer',
-                      fontWeight: filter === f.key ? 500 : 400
-                    }}
-                  >
-                    {f.label}
-                  </button>
-                ))}
-              </div>
-              <button className="btn btn-ghost btn-sm">View all</button>
-            </div>
-          </div>
-          <div style={{ overflowX: 'auto' }}>
-            <table className="data-table">
-              <thead>
-                <tr>
-                  <th>Work ID</th>
-                  <th>Description</th>
-                  <th>Department</th>
-                  <th>Assigned to</th>
-                  <th>Priority</th>
-                  <th>Due</th>
-                  <th>Progress</th>
-                  <th>Status</th>
-                </tr>
-              </thead>
-              <tbody>
-                {filtered.map(w => (
-                  <tr key={w.id} style={{ cursor: 'pointer' }}>
-                    <td className="col-id" style={{ fontWeight: 500, whiteSpace: 'nowrap' }}>{w.id}</td>
-                    <td>
-                      <div style={{ fontWeight: 500, fontSize: 12.5, marginBottom: 2 }}>{w.title}</div>
-                      <div style={{ fontSize: 11, color: 'var(--text-muted)' }}>
-                        {w.location} · {w.ward}
-                      </div>
-                    </td>
-                    <td style={{ whiteSpace: 'nowrap', color: 'var(--text-secondary)' }}>{w.dept}</td>
-                    <td style={{ fontSize: 12, color: 'var(--text-secondary)', whiteSpace: 'nowrap' }}>{w.worker}</td>
-                    <td>{priBadge(w.priority)}</td>
-                    <td style={{ whiteSpace: 'nowrap', fontSize: 12, color: w.status === 'overdue' ? 'var(--red)' : 'var(--text-secondary)' }}>
-                      {w.due}
-                    </td>
-                    <td style={{ minWidth: 80 }}>
-                      <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
-                        <div style={{ flex: 1, height: 3, background: 'var(--border)', borderRadius: 2 }}>
-                          <div style={{
-                            height: 3, borderRadius: 2,
-                            width: `${w.progress}%`,
-                            background: w.status === 'overdue' ? 'var(--red)'
-                              : w.status === 'done' ? 'var(--green)'
-                              : 'var(--accent)'
-                          }} />
-                        </div>
-                        <span style={{ fontSize: 11, color: 'var(--text-muted)', whiteSpace: 'nowrap' }}>
-                          {w.progress}%
-                        </span>
-                      </div>
-                    </td>
-                    <td>{statusBadge(w.status)}</td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
-          </div>
+      <div className="panel dashboard-complaints-panel">
+        <div className="panel-header">
+          <span className="t-strong">Recent Complaints</span>
+          <span className="badge badge-sanc">{filteredComplaints.length}</span>
         </div>
-
-        {/* Right column */}
-        <div style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
-
-          {/* Critical complaints */}
-          <div className="panel">
-            <div className="panel-header">
-              <span className="t-strong">Critical Complaints</span>
-              <span className="badge badge-late">{critical} urgent</span>
-            </div>
-            <div>
-              {COMPLAINTS.map((c, i) => (
-                <div key={c.id} style={{
-                  padding: '10px 14px',
-                  borderBottom: i < COMPLAINTS.length - 1 ? '1px solid var(--border)' : 'none',
-                  cursor: 'pointer'
-                }}>
-                  <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: 4 }}>
-                    <span style={{ fontSize: 11, color: 'var(--text-muted)', fontWeight: 500 }}>{c.id}</span>
-                    <div style={{ display: 'flex', gap: 6, alignItems: 'center' }}>
-                      {priBadge(c.priority)}
-                      <span style={{ fontSize: 10.5, color: 'var(--text-muted)' }}>{c.time}</span>
-                    </div>
-                  </div>
-                  <div style={{ fontSize: 12.5, fontWeight: 500, color: 'var(--text-primary)', marginBottom: 2 }}>
-                    {c.text}
-                  </div>
-                  <div style={{ fontSize: 11, color: 'var(--text-muted)' }}>{c.location}</div>
-                </div>
-              ))}
-            </div>
-          </div>
-
-          {/* Department load */}
-          <div className="panel">
-            <div className="panel-header">
-              <span className="t-strong">Department Load</span>
-            </div>
-            <div style={{ padding: '10px 14px', display: 'flex', flexDirection: 'column', gap: 10 }}>
-              {[
-                { dept: 'Roads & Pavements', active: 3, total: 8 },
-                { dept: 'Drainage & Sewage', active: 2, total: 5 },
-                { dept: 'Electrical', active: 1, total: 4 },
-                { dept: 'Water Supply', active: 2, total: 6 },
-                { dept: 'Sanitation', active: 1, total: 7 },
-              ].map(d => (
-                <div key={d.dept}>
-                  <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: 4, fontSize: 12 }}>
-                    <span style={{ color: 'var(--text-primary)' }}>{d.dept}</span>
-                    <span style={{ color: 'var(--text-muted)' }}>{d.active}/{d.total} active</span>
-                  </div>
-                  <div style={{ height: 3, background: 'var(--border)', borderRadius: 2 }}>
-                    <div style={{
-                      height: 3, borderRadius: 2,
-                      width: `${(d.active / d.total) * 100}%`,
-                      background: 'var(--accent)'
-                    }} />
+        {filteredComplaints.length === 0 ? (
+          <div className="dashboard-empty">No recent complaints match the selected filters.</div>
+        ) : (
+          <div className="dashboard-complaint-list">
+            {filteredComplaints.map(complaint => (
+              <article key={complaint.id} className="dashboard-complaint-item">
+                <div>
+                  <div className="dashboard-primary">{complaint.description}</div>
+                  <div className="t-caption">
+                    #{complaint.id} · {complaint.locationAddress} · {new Date(complaint.createdAt).toLocaleString()}
                   </div>
                 </div>
-              ))}
-            </div>
+                <div className="dashboard-complaint-badges">
+                  {decisionBadge(complaint.severity)}
+                  <span className="badge badge-sanc">{formatEnum(complaint.issueType)}</span>
+                  {complaint.aiAssisted && <span className="badge badge-ip">AI assisted</span>}
+                </div>
+              </article>
+            ))}
           </div>
+        )}
+      </div>
 
-        </div>
+      <div className="dashboard-distribution-grid">
+        <DistributionChart title="Work Status Distribution" items={dashboard.workStatusDistribution} />
+        <DistributionChart title="Complaint Severity Distribution" items={dashboard.complaintSeverityDistribution} />
       </div>
     </div>
   )

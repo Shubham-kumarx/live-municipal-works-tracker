@@ -33,6 +33,12 @@ public class PriorityCalculationService {
                         "Project not found: " + projectId));
         List<Complaint> complaints = complaintRepository.findByMunicipalProjectId(projectId);
 
+        return calculate(project, complaints, calculationDate, calculatedAt);
+    }
+
+    public Calculation calculate(MunicipalProject project, List<Complaint> complaints,
+                                 LocalDate calculationDate, LocalDateTime calculatedAt) {
+
         PriorityFactorCalculator.FactorResult severity = factorCalculator.severity(
                 complaints.stream().map(Complaint::getFinalSeverity).toList());
         PriorityFactorCalculator.FactorResult volume = factorCalculator.complaintVolume(complaints.size());

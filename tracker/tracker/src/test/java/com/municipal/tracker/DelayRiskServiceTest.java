@@ -135,6 +135,19 @@ class DelayRiskServiceTest {
     }
 
     @Test
+    void calculatesFromAnAlreadyLoadedProject() {
+        LocalDate date = LocalDate.of(2026, 9, 28);
+        MunicipalProject project = activeProject(12L, date.plusDays(10), 0);
+
+        DelayRiskService.Calculation result = realService().calculate(
+                project, date, LocalDateTime.of(2026, 9, 28, 6, 0));
+
+        assertThat(result.project()).isSameAs(project);
+        assertThat(result.available()).isTrue();
+        assertThat(result.delayRisk()).isNotNull();
+    }
+
+    @Test
     void classifiesExactConfiguredGapBoundaries() {
         assertThat(service.classifyGap(10.0)).isEqualTo(DelayRisk.ON_TRACK);
         assertThat(service.classifyGap(11.0)).isEqualTo(DelayRisk.AT_RISK);
