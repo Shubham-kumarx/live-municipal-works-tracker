@@ -2,7 +2,7 @@ import { useCallback, useEffect, useRef, useState } from 'react'
 import FieldUpdateForm from '../components/FieldUpdateForm'
 import api from '../api/axios'
 import { getSession } from '../auth/session'
-import { WS_URL } from '../config/backend'
+import { API_BASE_URL, WS_URL } from '../config/backend'
 import L from 'leaflet'
 import 'leaflet/dist/leaflet.css'
 import SockJS from 'sockjs-client'
@@ -71,6 +71,9 @@ export default function MapView() {
   const [delayRisk, setDelayRisk] = useState(null)
   const [delayRiskLoading, setDelayRiskLoading] = useState(false)
   const [delayRiskError, setDelayRiskError] = useState('')
+  const [linkedComplaints, setLinkedComplaints] = useState([])
+  const [linkedComplaintsLoading, setLinkedComplaintsLoading] = useState(false)
+  const [linkedComplaintsError, setLinkedComplaintsError] = useState('')
   
   
 
@@ -136,6 +139,25 @@ export default function MapView() {
         if (!cancelled) setDelayRiskLoading(false)
       })
 
+    return () => { cancelled = true }
+  }, [selected])
+
+  useEffect(() => {
+    if (!selected) {
+      setLinkedComplaints([]); setLinkedComplaintsError(''); setLinkedComplaintsLoading(false)
+      return
+    }
+    let cancelled = false
+    setLinkedComplaintsLoading(true); setLinkedComplaintsError('')
+    api.get(`/api/projects/${selected.id}/complaints`)
+      .then(({ data }) => { if (!cancelled) setLinkedComplaints(data) })
+      .catch(() => {
+        if (!cancelled) {
+          setLinkedComplaints([])
+          setLinkedComplaintsError('Linked complaints could not be loaded.')
+        }
+      })
+      .finally(() => { if (!cancelled) setLinkedComplaintsLoading(false) })
     return () => { cancelled = true }
   }, [selected])
 
@@ -560,6 +582,47 @@ export default function MapView() {
                       {delayRisk.reason}
                     </div>
                   </>
+                )}
+              </div>
+
+              {/* Linked complaints */}
+              <div>
+                <div className="t-label" style={{ marginBottom: 6 }}>
+                  Linked complaints {linkedComplaints.length > 0 ? `(${linkedComplaints.length})` : ''}
+                </div>
+                {linkedComplaintsLoading && <div className="t-caption">Loading linked complaints...</div>}
+                {linkedComplaintsError && (
+                  <div style={{ fontSize: 11.5, color: 'var(--red)' }}>{linkedComplaintsError}</div>
+                )}
+                {!linkedComplaintsLoading && !linkedComplaintsError && linkedComplaints.length === 0 && (
+                  <div className="t-caption">No complaints are linked to this work.</div>
+                )}
+                {linkedComplaints.length > 0 && (
+                  <div style={{ display: 'flex', flexDirection: 'column', gap: 6, maxHeight: 260, overflowY: 'auto' }}>
+                    {linkedComplaints.map(complaint => (
+                      <div key={complaint.id} style={{
+                        border: '1px solid var(--border)', borderRadius: 'var(--r-md)',
+                        padding: 8, display: 'flex', gap: 8
+                      }}>
+                        {complaint.imageUrl && (
+                          <img src={complaint.imageUrl.startsWith('http')
+                            ? complaint.imageUrl : `${API_BASE_URL}${complaint.imageUrl}`}
+                            alt="Municipal complaint" style={{
+                              width: 48, height: 48, objectFit: 'cover', borderRadius: 'var(--r-sm)'
+                            }} />
+                        )}
+                        <div style={{ minWidth: 0 }}>
+                          <div style={{ fontSize: 11.5, fontWeight: 500 }}>
+                            #{complaint.id} · {complaint.finalIssueType?.replaceAll('_', ' ')}
+                          </div>
+                          <div className="t-caption">{complaint.finalSeverity} · {complaint.locationAddress}</div>
+                          <div style={{ fontSize: 11, color: 'var(--text-secondary)', marginTop: 2 }}>
+                            {complaint.description}
+                          </div>
+                        </div>
+                      </div>
+                    ))}
+                  </div>
                 )}
               </div>
 

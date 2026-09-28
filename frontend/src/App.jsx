@@ -8,6 +8,7 @@ import Login from './pages/Login'
 import Register from './pages/Register'
 import AddStaff from './pages/AddStaff'
 import Complaints from './pages/Complaints'
+import AdminComplaints from './pages/AdminComplaints'
 import ProtectedRoute from './components/ProtectedRoute'
 import { getSession, landingPath } from './auth/session'
 
@@ -37,7 +38,11 @@ export default function App() {
           <Route path="work-orders" element={<ProtectedRoute roles={['MUNICIPAL_ADMIN', 'WARD_OFFICER']}><WorkOrders /></ProtectedRoute>} />
           <Route path="map" element={<ProtectedRoute roles={['CITIZEN', 'FIELD_WORKER', 'WARD_OFFICER', 'MUNICIPAL_ADMIN', 'AUDITOR']}><MapView /></ProtectedRoute>} />
           <Route path="field-teams" element={<ProtectedRoute roles={['MUNICIPAL_ADMIN', 'WARD_OFFICER']}><FieldTeams /></ProtectedRoute>} />
-          <Route path="complaints" element={<ProtectedRoute roles={['CITIZEN']}><Complaints /></ProtectedRoute>} />
+          <Route path="complaints" element={
+            <ProtectedRoute roles={['CITIZEN', 'MUNICIPAL_ADMIN', 'WARD_OFFICER']}>
+              {role === 'CITIZEN' ? <Complaints /> : <AdminComplaints />}
+            </ProtectedRoute>
+          } />
           <Route path="reports" element={<ComingSoon page="Reports" />} />
           <Route path="settings" element={<ComingSoon page="Settings" />} />
         </Route>

@@ -77,7 +77,7 @@ public class SecurityConfig {
                         .requestMatchers("/api/projects/ward/**").permitAll()
                         .requestMatchers("/uploads/**").permitAll()
                         .requestMatchers("/ws/**").permitAll()
-                        .requestMatchers("/api/complaints/**").hasRole("CITIZEN")
+                        .requestMatchers("/api/complaints/**").authenticated()
                         .anyRequest().authenticated()
                 )
                 .sessionManagement(session -> session

@@ -7,6 +7,7 @@ import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.data.jpa.test.autoconfigure.DataJpaTest;
 import org.springframework.test.context.ActiveProfiles;
+import jakarta.persistence.Table;
 
 import static org.assertj.core.api.Assertions.assertThat;
 
@@ -36,5 +37,14 @@ class ComplaintRepositoryTest {
         assertThat(saved.getId()).isNotNull();
         assertThat(complaintRepository.findByReportingUserIdOrderByCreatedAtDesc(citizen.getId()))
                 .extracting(Complaint::getId).containsExactly(saved.getId());
+    }
+
+    @Test
+    void declaresIndexForProjectAssociationQueries() {
+        Table table = Complaint.class.getAnnotation(Table.class);
+
+        assertThat(table.indexes())
+                .anyMatch(index -> index.name().equals("idx_complaint_municipal_project")
+                        && index.columnList().equals("municipal_project_id"));
     }
 }

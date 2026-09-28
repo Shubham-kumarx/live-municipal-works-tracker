@@ -13,7 +13,8 @@ import java.time.LocalDateTime;
 @Entity
 @Table(name = "complaints", indexes = {
         @Index(name = "idx_complaint_reporting_user", columnList = "reporting_user_id"),
-        @Index(name = "idx_complaint_status", columnList = "status")
+        @Index(name = "idx_complaint_status", columnList = "status"),
+        @Index(name = "idx_complaint_municipal_project", columnList = "municipal_project_id")
 })
 public class Complaint {
     @Id
