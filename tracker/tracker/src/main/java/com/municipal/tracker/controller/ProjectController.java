@@ -7,13 +7,15 @@ import com.municipal.tracker.dto.ProjectBudgetUpdateRequest;
 import com.municipal.tracker.dto.ProjectCreateRequest;
 import com.municipal.tracker.dto.ProjectImpactUpdateRequest;
 import com.municipal.tracker.dto.ProjectPriorityResponse;
+import com.municipal.tracker.dto.ProjectDelayRiskResponse;
 import jakarta.validation.Valid;
 import com.municipal.tracker.model.ProjectStatus;
 import com.municipal.tracker.model.User;
 import com.municipal.tracker.service.ProjectService;
 import com.municipal.tracker.service.ProjectAccessService;
 import com.municipal.tracker.service.PriorityCalculationService;
-import lombok.RequiredArgsConstructor;
+import com.municipal.tracker.service.DelayRiskService;
+import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.access.prepost.PreAuthorize;
@@ -24,12 +26,29 @@ import java.util.Map;
 
 @RestController
 @RequestMapping("/api/projects")
-@RequiredArgsConstructor
 public class ProjectController {
 
     private final ProjectService projectService;
     private final PriorityCalculationService priorityCalculationService;
     private final ProjectAccessService projectAccessService;
+    private final DelayRiskService delayRiskService;
+
+    @Autowired
+    public ProjectController(ProjectService projectService,
+                             PriorityCalculationService priorityCalculationService,
+                             ProjectAccessService projectAccessService,
+                             DelayRiskService delayRiskService) {
+        this.projectService = projectService;
+        this.priorityCalculationService = priorityCalculationService;
+        this.projectAccessService = projectAccessService;
+        this.delayRiskService = delayRiskService;
+    }
+
+    public ProjectController(ProjectService projectService,
+                             PriorityCalculationService priorityCalculationService,
+                             ProjectAccessService projectAccessService) {
+        this(projectService, priorityCalculationService, projectAccessService, null);
+    }
 
     // ── GET all projects in a ward (public - for map)
     // GET http://localhost:8080/api/projects/ward/2
@@ -162,5 +181,15 @@ public class ProjectController {
         PriorityCalculationService.Calculation calculation = priorityCalculationService.calculate(id);
         projectAccessService.requireProjectWardAccess(currentUser, calculation.project());
         return ResponseEntity.ok(ProjectPriorityResponse.from(calculation));
+    }
+
+    @GetMapping("/{id}/delay-risk")
+    @PreAuthorize("hasAnyRole('CITIZEN','FIELD_WORKER','WARD_OFFICER','MUNICIPAL_ADMIN','AUDITOR')")
+    public ResponseEntity<ProjectDelayRiskResponse> getDelayRisk(
+            @PathVariable Long id,
+            @AuthenticationPrincipal User currentUser) {
+        DelayRiskService.Calculation calculation = delayRiskService.calculate(id);
+        projectAccessService.requireProjectWardAccess(currentUser, calculation.project());
+        return ResponseEntity.ok(ProjectDelayRiskResponse.from(calculation));
     }
 }

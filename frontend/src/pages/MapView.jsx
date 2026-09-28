@@ -35,6 +35,23 @@ function statusBadge(s) {
   return <span className={`badge ${map[s] || 'badge-sanc'}`}>{STATUS_LABEL[s] || s}</span>
 }
 
+const DELAY_RISK_LABEL = {
+  ON_TRACK: 'On track',
+  AT_RISK: 'At risk',
+  HIGH_DELAY_RISK: 'High delay risk',
+}
+
+const DELAY_RISK_STYLE = {
+  ON_TRACK: { background: 'var(--green-lt)', color: 'var(--green)' },
+  AT_RISK: { background: 'var(--amber-lt)', color: 'var(--amber)' },
+  HIGH_DELAY_RISK: { background: 'var(--red-lt)', color: 'var(--red)' },
+}
+
+function formatProgress(value) {
+  if (!Number.isFinite(value)) return 'Unavailable'
+  return `${Number(value.toFixed(2))}%`
+}
+
 export default function MapView() {
   const mapRef      = useRef(null)
   const mapInstance = useRef(null)
@@ -51,6 +68,9 @@ export default function MapView() {
   const [loadError, setLoadError] = useState('')
   const [wsStatus, setWsStatus]   = useState('connecting')
   const [showUpdateForm, setShowUpdateForm] = useState(false)
+  const [delayRisk, setDelayRisk] = useState(null)
+  const [delayRiskLoading, setDelayRiskLoading] = useState(false)
+  const [delayRiskError, setDelayRiskError] = useState('')
   
   
 
@@ -90,6 +110,34 @@ export default function MapView() {
   useEffect(() => {
     loadProjects(true).catch(() => {})
   }, [loadProjects])
+
+  useEffect(() => {
+    if (!selected) {
+      setDelayRisk(null)
+      setDelayRiskError('')
+      setDelayRiskLoading(false)
+      return
+    }
+
+    let cancelled = false
+    setDelayRiskLoading(true)
+    setDelayRiskError('')
+    api.get(`/api/projects/${selected.id}/delay-risk`)
+      .then(({ data }) => {
+        if (!cancelled) setDelayRisk(data)
+      })
+      .catch(() => {
+        if (!cancelled) {
+          setDelayRisk(null)
+          setDelayRiskError('Delay risk could not be calculated.')
+        }
+      })
+      .finally(() => {
+        if (!cancelled) setDelayRiskLoading(false)
+      })
+
+    return () => { cancelled = true }
+  }, [selected])
 
   // ── WebSocket connection ─────────────────
   useEffect(() => {
@@ -460,6 +508,59 @@ export default function MapView() {
                       : 'var(--accent)'
                   }} />
                 </div>
+              </div>
+
+              {/* Rule-based delay risk */}
+              <div style={{
+                border: '1px solid var(--border)',
+                borderRadius: 'var(--r-md)', padding: '10px 12px',
+                background: 'var(--bg-hover)'
+              }}>
+                <div style={{
+                  display: 'flex', justifyContent: 'space-between',
+                  alignItems: 'center', marginBottom: 8
+                }}>
+                  <span className="t-label">Delay risk</span>
+                  {delayRiskLoading && (
+                    <span style={{ fontSize: 11, color: 'var(--text-muted)' }}>Calculating...</span>
+                  )}
+                  {!delayRiskLoading && delayRisk?.available && (
+                    <span className="badge" style={DELAY_RISK_STYLE[delayRisk.delayRisk]}>
+                      {DELAY_RISK_LABEL[delayRisk.delayRisk] || delayRisk.delayRisk}
+                    </span>
+                  )}
+                  {!delayRiskLoading && delayRisk && !delayRisk.available && (
+                    <span className="badge badge-sanc">Unavailable</span>
+                  )}
+                </div>
+
+                {delayRiskError ? (
+                  <div style={{ fontSize: 11.5, color: 'var(--red)' }}>{delayRiskError}</div>
+                ) : !delayRiskLoading && delayRisk && (
+                  <>
+                    <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '6px 12px' }}>
+                      {[
+                        ['Expected progress', formatProgress(delayRisk.expectedProgress)],
+                        ['Actual progress', formatProgress(delayRisk.actualProgress)],
+                        ['Progress gap', formatProgress(delayRisk.progressGap)],
+                        ['Deadline', delayRisk.overdue ? 'Passed' : 'Not passed'],
+                      ].map(([label, value]) => (
+                        <div key={label}>
+                          <div style={{ fontSize: 10.5, color: 'var(--text-muted)' }}>{label}</div>
+                          <div style={{ fontSize: 12, fontWeight: 500, color: 'var(--text-primary)' }}>
+                            {value}
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+                    <div style={{
+                      fontSize: 11, color: 'var(--text-secondary)', lineHeight: 1.5,
+                      marginTop: 8, paddingTop: 8, borderTop: '1px solid var(--border)'
+                    }}>
+                      {delayRisk.reason}
+                    </div>
+                  </>
+                )}
               </div>
 
               {/* Details grid */}
