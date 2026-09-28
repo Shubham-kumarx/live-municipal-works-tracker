@@ -5,7 +5,7 @@ import { getSession } from '../auth/session'
 import { API_BASE_URL, WS_URL } from '../config/backend'
 import L from 'leaflet'
 import 'leaflet/dist/leaflet.css'
-import SockJS from 'sockjs-client'
+import SockJS from 'sockjs-client/dist/sockjs'
 import { Client } from '@stomp/stompjs'
 
 const STATUS_COLOR = {
@@ -51,6 +51,16 @@ const DELAY_RISK_STYLE = {
   ON_TRACK: { background: 'var(--green-lt)', color: 'var(--green)' },
   AT_RISK: { background: 'var(--amber-lt)', color: 'var(--amber)' },
   HIGH_DELAY_RISK: { background: 'var(--red-lt)', color: 'var(--red)' },
+}
+
+function formatScore(value) {
+  if (value === null || value === undefined || value === '') return 'Unavailable'
+  const score = Number(value)
+  return Number.isFinite(score) ? score.toFixed(1) : 'Unavailable'
+}
+
+function hasScore(value) {
+  return value !== null && value !== undefined && value !== '' && Number.isFinite(Number(value))
 }
 
 function formatProgress(value) {
@@ -593,7 +603,7 @@ export default function MapView() {
                   </div>
                 ) : !priorityLoading && priority && (
                   <>
-                    <div style={{ fontSize: 18, fontWeight: 500 }}>{priority.totalScore.toFixed(1)} / 100</div>
+                    <div style={{ fontSize: 18, fontWeight: 500 }}>{formatScore(priority.totalScore)}{hasScore(priority.totalScore) ? ' / 100' : ''}</div>
                     <div className="t-caption">Decision-support score; not an official government formula.</div>
                   </>
                 )}

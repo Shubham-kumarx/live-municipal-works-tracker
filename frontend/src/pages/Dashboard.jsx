@@ -21,6 +21,12 @@ function formatDate(value) {
   return new Intl.DateTimeFormat(undefined, { dateStyle: 'medium' }).format(new Date(`${value}T00:00:00`))
 }
 
+function formatScore(value) {
+  if (value === null || value === undefined || value === '') return 'Unavailable'
+  const score = Number(value)
+  return Number.isFinite(score) ? score.toFixed(1) : 'Unavailable'
+}
+
 function decisionBadge(value) {
   const className = ['CRITICAL', 'HIGH', 'HIGH_DELAY_RISK', 'DELAYED'].includes(value)
     ? 'badge-late'
@@ -59,7 +65,7 @@ function WorkDecisionTable({ title, works, emptyMessage, showRisk = false }) {
                     <div className="t-caption">#{work.id} · {formatEnum(work.status)}</div>
                   </td>
                   <td>{work.locationAddress || 'Not provided'}</td>
-                  <td>{decisionBadge(work.priorityLevel)} <span className="t-caption">{work.priorityScore.toFixed(1)}</span></td>
+                  <td>{decisionBadge(work.priorityLevel)} <span className="t-caption">{formatScore(work.priorityScore)}</span></td>
                   {showRisk && <td>{decisionBadge(work.delayRisk)}</td>}
                   <td>{formatDate(work.expectedEndDate)}</td>
                   <td>{work.progressPercentage ?? 0}%</td>
