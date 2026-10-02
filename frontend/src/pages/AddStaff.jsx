@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useState } from 'react'
 import api from '../api/axios'
+import { apiErrorMessage } from '../api/errors'
 import { getSession } from '../auth/session'
 
 export default function AddStaff() {
@@ -63,7 +64,7 @@ export default function AddStaff() {
       setForm({ fullName: '', email: '', password: '', phone: '', role: 'FIELD_WORKER',
         wardId: isAdmin ? '' : String(user.wardId || '') })
     } catch (err) {
-      setError(err.response?.data?.message || 'Failed to create account')
+      setError(apiErrorMessage(err, 'Failed to create account'))
     } finally {
       setLoading(false)
     }

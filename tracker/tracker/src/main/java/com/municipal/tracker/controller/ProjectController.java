@@ -9,6 +9,7 @@ import com.municipal.tracker.dto.ProjectImpactUpdateRequest;
 import com.municipal.tracker.dto.ProjectPriorityResponse;
 import com.municipal.tracker.dto.ProjectDelayRiskResponse;
 import com.municipal.tracker.dto.WardProjectStatsResponse;
+import com.municipal.tracker.exception.ResourceNotFoundException;
 import jakarta.validation.Valid;
 import com.municipal.tracker.model.ProjectStatus;
 import com.municipal.tracker.model.User;
@@ -55,9 +56,9 @@ public class ProjectController {
     @GetMapping("/{id}")
     public ResponseEntity<ProjectResponse> getProjectById(
             @PathVariable Long id) {
-        return projectService.getProjectById(id)
-                .map(ProjectResponse::from).map(ResponseEntity::ok)
-                .orElse(ResponseEntity.notFound().build());
+        MunicipalProject project = projectService.getProjectById(id)
+                .orElseThrow(() -> new ResourceNotFoundException("Project", id));
+        return ResponseEntity.ok(ProjectResponse.from(project));
     }
 
     // ── GET ward dashboard stats

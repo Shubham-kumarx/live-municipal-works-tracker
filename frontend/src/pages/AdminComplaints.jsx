@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useState } from 'react'
 import api from '../api/axios'
+import { apiErrorMessage } from '../api/errors'
 
 const label = value => value?.replaceAll('_', ' ').toLowerCase().replace(/^./, c => c.toUpperCase())
 
@@ -23,7 +24,7 @@ export default function AdminComplaints() {
       setComplaints(complaintResponse.data)
       setProjects(projectResponse.data)
     } catch (requestError) {
-      setError(requestError.response?.data?.message || 'Complaints could not be loaded.')
+      setError(apiErrorMessage(requestError, 'Complaints could not be loaded.'))
     } finally {
       setLoading(false)
     }
@@ -43,7 +44,7 @@ export default function AdminComplaints() {
       await loadData()
       setSuccess(`Complaint #${complaintId} was linked successfully.`)
     } catch (requestError) {
-      setError(requestError.response?.data?.message || 'Complaint could not be linked.')
+      setError(apiErrorMessage(requestError, 'Complaint could not be linked.'))
     } finally {
       setBusyId(null)
     }
@@ -56,7 +57,7 @@ export default function AdminComplaints() {
       await loadData()
       setSuccess(`Complaint #${complaintId} was unlinked successfully.`)
     } catch (requestError) {
-      setError(requestError.response?.data?.message || 'Complaint could not be unlinked.')
+      setError(apiErrorMessage(requestError, 'Complaint could not be unlinked.'))
     } finally {
       setBusyId(null)
     }

@@ -11,7 +11,7 @@ import java.io.ByteArrayInputStream;
 import java.io.IOException;
 import java.util.*;
 
-import static org.springframework.http.HttpStatus.PAYLOAD_TOO_LARGE;
+import static org.springframework.http.HttpStatus.CONTENT_TOO_LARGE;
 
 @Service
 public class MunicipalImageValidator {
@@ -22,7 +22,7 @@ public class MunicipalImageValidator {
 
     public ValidatedImage validate(MultipartFile file) {
         if (file == null || file.isEmpty()) throw new IllegalArgumentException("Empty photos are not allowed");
-        if (file.getSize() > MAX_FILE_BYTES) throw new ResponseStatusException(PAYLOAD_TOO_LARGE, "Photo exceeds 10 MB");
+        if (file.getSize() > MAX_FILE_BYTES) throw new ResponseStatusException(CONTENT_TOO_LARGE, "Photo exceeds 10 MB");
         String mime = Optional.ofNullable(file.getContentType()).orElse("").toLowerCase(Locale.ROOT);
         Set<String> extensions = MIME_EXTENSIONS.get(mime);
         if (extensions == null) throw new IllegalArgumentException("Only JPEG and PNG photos are allowed");

@@ -99,6 +99,39 @@ class ComplaintControllerTest {
     }
 
     @Test
+    @WithMockUser(roles = "CITIZEN")
+    void unsupportedSeverityReturnsSafeValidationError() throws Exception {
+        MockMultipartFile request = new MockMultipartFile("complaint", "", "application/json", """
+                {"description":"Pothole","locationAddress":"Test Road","finalIssueType":"POTHOLE",
+                 "finalSeverity":"EXTREME","predictionState":"MANUAL"}
+                """.getBytes());
+        MockMultipartFile image = new MockMultipartFile(
+                "image", "road.png", "image/png", new byte[]{1, 2, 3});
+
+        mockMvc.perform(multipart("/api/complaints").file(request).file(image))
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.message").value("Unsupported complaint severity"))
+                .andExpect(jsonPath("$.status").value(400))
+                .andExpect(jsonPath("$.path").value("/api/complaints"));
+    }
+
+    @Test
+    @WithMockUser(roles = "CITIZEN")
+    void unsupportedIssueTypeReturnsSafeValidationError() throws Exception {
+        MockMultipartFile request = new MockMultipartFile("complaint", "", "application/json", """
+                {"description":"Pothole","locationAddress":"Test Road","finalIssueType":"SINKHOLE",
+                 "finalSeverity":"HIGH","predictionState":"MANUAL"}
+                """.getBytes());
+        MockMultipartFile image = new MockMultipartFile(
+                "image", "road.png", "image/png", new byte[]{1, 2, 3});
+
+        mockMvc.perform(multipart("/api/complaints").file(request).file(image))
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.message").value("Unsupported complaint issue type"))
+                .andExpect(jsonPath("$.status").value(400));
+    }
+
+    @Test
     @WithMockUser(roles = "WARD_OFFICER")
     void managerCanListComplaintsAsSafeResponseDtos() throws Exception {
         ComplaintResponse complaint = new ComplaintResponse(44L, 5L, "Citizen",
@@ -132,6 +165,9 @@ class ComplaintControllerTest {
         mockMvc.perform(multipart("/api/complaints/analyze").file(image))
                 .andExpect(status().isServiceUnavailable())
                 .andExpect(jsonPath("$.message").value(
-                        "AI analysis is temporarily unavailable; continue with manual classification"));
+                        "AI analysis is temporarily unavailable; continue with manual classification"))
+                .andExpect(jsonPath("$.status").value(503))
+                .andExpect(jsonPath("$.error").value("Service Unavailable"))
+                .andExpect(jsonPath("$.path").value("/api/complaints/analyze"));
     }
 }

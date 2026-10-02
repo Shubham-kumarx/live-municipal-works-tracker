@@ -1,10 +1,13 @@
 package com.municipal.tracker.config;
 
+import com.municipal.tracker.exception.ApiExceptionHandler;
 import com.municipal.tracker.repository.UserRepository;
 import lombok.RequiredArgsConstructor;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 import org.springframework.beans.factory.annotation.Value;
+import org.springframework.http.HttpStatus;
+import org.springframework.http.MediaType;
 import org.springframework.security.authentication.AuthenticationManager;
 import org.springframework.security.config.annotation.authentication.configuration.AuthenticationConfiguration;
 import org.springframework.security.config.annotation.method.configuration.EnableMethodSecurity;
@@ -21,6 +24,8 @@ import org.springframework.web.cors.CorsConfiguration;
 import org.springframework.web.cors.CorsConfigurationSource;
 import org.springframework.web.cors.UrlBasedCorsConfigurationSource;
 import java.util.List;
+import java.util.Map;
+import tools.jackson.databind.json.JsonMapper;
 
 @Configuration
 @EnableWebSecurity
@@ -30,6 +35,7 @@ public class SecurityConfig {
 
     private final JwtFilter jwtFilter;
     private final UserRepository userRepository;
+    private final JsonMapper jsonMapper;
     @Value("${app.cors.allowed-origins:http://localhost:5173}")
     private String allowedOrigins;
     @Bean
@@ -83,6 +89,21 @@ public class SecurityConfig {
                 .sessionManagement(session -> session
                         .sessionCreationPolicy(SessionCreationPolicy.STATELESS)
                 )
+                .exceptionHandling(exceptions -> exceptions
+                        .authenticationEntryPoint((request, response, exception) -> {
+                            response.setStatus(HttpStatus.UNAUTHORIZED.value());
+                            response.setContentType(MediaType.APPLICATION_JSON_VALUE);
+                            jsonMapper.writeValue(response.getOutputStream(), ApiExceptionHandler.error(
+                                    HttpStatus.UNAUTHORIZED, "Authentication required",
+                                    request.getRequestURI(), Map.of()));
+                        })
+                        .accessDeniedHandler((request, response, exception) -> {
+                            response.setStatus(HttpStatus.FORBIDDEN.value());
+                            response.setContentType(MediaType.APPLICATION_JSON_VALUE);
+                            jsonMapper.writeValue(response.getOutputStream(), ApiExceptionHandler.error(
+                                    HttpStatus.FORBIDDEN, "Access denied",
+                                    request.getRequestURI(), Map.of()));
+                        }))
                 .addFilterBefore(jwtFilter,
                         UsernamePasswordAuthenticationFilter.class);
 

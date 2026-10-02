@@ -61,7 +61,19 @@ class AdminDashboardControllerTest {
     @WithMockUser(roles = "CITIZEN")
     void citizenCannotLoadDashboard() throws Exception {
         mockMvc.perform(get("/api/dashboard"))
-                .andExpect(status().isForbidden());
+                .andExpect(status().isForbidden())
+                .andExpect(jsonPath("$.status").value(403))
+                .andExpect(jsonPath("$.message").value("Access denied"))
+                .andExpect(jsonPath("$.path").value("/api/dashboard"));
+    }
+
+    @Test
+    void anonymousUserReceivesStructuredUnauthorizedResponse() throws Exception {
+        mockMvc.perform(get("/api/dashboard"))
+                .andExpect(status().isUnauthorized())
+                .andExpect(jsonPath("$.status").value(401))
+                .andExpect(jsonPath("$.message").value("Authentication required"))
+                .andExpect(jsonPath("$.path").value("/api/dashboard"));
     }
 
     private void stubResponse() {

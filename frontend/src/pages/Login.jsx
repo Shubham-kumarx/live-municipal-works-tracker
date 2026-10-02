@@ -2,6 +2,7 @@ import { useState } from 'react'
 import { useNavigate, Link } from 'react-router-dom'
 import { landingPath } from '../auth/session'
 import api from '../api/axios'
+import { apiErrorMessage } from '../api/errors'
 
 export default function Login() {
   const navigate = useNavigate()
@@ -31,10 +32,7 @@ export default function Login() {
       }))
       navigate(landingPath(res.data.role))
     } catch (err) {
-      setError(
-        err.response?.data?.message ||
-        'Invalid email or password'
-      )
+      setError(apiErrorMessage(err, 'Invalid email or password'))
     } finally {
       setLoading(false)
     }

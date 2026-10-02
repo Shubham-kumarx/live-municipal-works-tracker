@@ -1,5 +1,6 @@
 import { useEffect, useRef, useState } from 'react'
 import api from '../api/axios'
+import { apiErrorMessage } from '../api/errors'
 
 const MAX_IMAGE_BYTES = 10 * 1024 * 1024
 const ISSUE_TYPES = ['POTHOLE', 'ROAD_CRACK', 'GARBAGE_ACCUMULATION', 'WATERLOGGING',
@@ -82,8 +83,8 @@ export default function Complaints() {
     } catch (requestError) {
       setAnalysis(null)
       setPredictionState('MANUAL')
-      setError(requestError.response?.data?.message
-        || 'AI analysis is unavailable. You can classify and submit the issue manually.')
+      setError(apiErrorMessage(requestError,
+        'AI analysis is unavailable. You can classify and submit the issue manually.'))
     } finally {
       setAnalyzing(false)
     }
@@ -150,7 +151,7 @@ export default function Complaints() {
       setLocationAddress('')
       if (fileInput.current) fileInput.current.value = ''
     } catch (requestError) {
-      setError(requestError.response?.data?.message || 'Complaint could not be submitted. Try again.')
+      setError(apiErrorMessage(requestError, 'Complaint could not be submitted. Try again.'))
     } finally {
       setSubmitting(false)
     }

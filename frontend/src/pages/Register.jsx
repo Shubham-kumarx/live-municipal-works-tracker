@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useState } from 'react'
 import { useNavigate, Link } from 'react-router-dom'
 import api from '../api/axios'
+import { apiErrorMessage } from '../api/errors'
 import { landingPath } from '../auth/session'
 function distanceKm(lat1, lng1, lat2, lng2) {
   const R = 6371
@@ -111,7 +112,7 @@ function detectNearestWard() {
       }))
       navigate(landingPath(res.data.role))
     } catch (err) {
-      setError(err.response?.data?.message || 'Registration failed. Try again.')
+      setError(apiErrorMessage(err, 'Registration failed. Try again.'))
     } finally {
       setLoading(false)
     }

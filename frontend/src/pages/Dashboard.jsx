@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useState } from 'react'
 import api from '../api/axios'
+import { apiErrorMessage } from '../api/errors'
 
 function Kpi({ value, label, detail, tone }) {
   return (
@@ -120,7 +121,7 @@ export default function Dashboard() {
       setDashboard(response.data)
     } catch (requestError) {
       setDashboard(null)
-      setError(requestError.response?.data?.message || 'Dashboard data could not be loaded.')
+      setError(apiErrorMessage(requestError, 'Dashboard data could not be loaded.'))
     } finally {
       setLoading(false)
     }

@@ -9,11 +9,11 @@ import lombok.Data;
 
 @Data
 public class WardWriteRequest {
-    @NotBlank @Size(max = 100) private String wardNumber;
-    @NotBlank @Size(max = 255) private String wardName;
-    @NotBlank @Size(max = 255) private String city;
-    @NotBlank @Size(max = 255) private String district;
-    @NotBlank @Size(max = 255) private String state;
+    @NotBlank(message = "Ward number is required") @Size(max = 100) private String wardNumber;
+    @NotBlank(message = "Ward name is required") @Size(max = 255) private String wardName;
+    @NotBlank(message = "City is required") @Size(max = 255) private String city;
+    @NotBlank(message = "District is required") @Size(max = 255) private String district;
+    @NotBlank(message = "State is required") @Size(max = 255) private String state;
     @DecimalMin("-90.0") @DecimalMax("90.0") private Double centerLatitude;
     @DecimalMin("-180.0") @DecimalMax("180.0") private Double centerLongitude;
     @Size(max = 100000) private String boundaryGeoJson;

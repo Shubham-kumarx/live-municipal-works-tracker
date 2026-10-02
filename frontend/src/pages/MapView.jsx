@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useRef, useState } from 'react'
 import FieldUpdateForm from '../components/FieldUpdateForm'
 import api from '../api/axios'
+import { apiErrorMessage } from '../api/errors'
 import { getSession } from '../auth/session'
 import { API_BASE_URL, WS_URL } from '../config/backend'
 import L from 'leaflet'
@@ -123,9 +124,8 @@ export default function MapView() {
         setLoading(false)
       }
     } catch (err) {
-      console.error('Failed to load projects:', err)
       if (sequence === fetchSequence.current) {
-        setLoadError('Projects could not be loaded. Please try again.')
+        setLoadError(apiErrorMessage(err, 'Projects could not be loaded. Please try again.'))
         setLoading(false)
       }
       throw err
