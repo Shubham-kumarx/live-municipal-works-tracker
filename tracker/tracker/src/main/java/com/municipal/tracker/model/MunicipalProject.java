@@ -65,6 +65,9 @@ public class MunicipalProject {
     @Column(columnDefinition = "TEXT")
     private String progressNote;
 
+    @Enumerated(EnumType.STRING)
+    private ProjectImpactLevel impactLevel;
+
     // ── Relationships ───────────────────────────
     @ManyToOne
     @JoinColumn(name = "ward_id", nullable = false)

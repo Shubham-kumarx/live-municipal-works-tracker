@@ -15,6 +15,10 @@ public interface ProjectRepository extends JpaRepository<MunicipalProject, Long>
     // Get all projects in a ward
     List<MunicipalProject> findByWardId(Long wardId);
 
+    List<MunicipalProject> findAllByOrderByCreatedAtDesc();
+
+    List<MunicipalProject> findByWardIdOrderByCreatedAtDesc(Long wardId);
+
     // Get all projects in a ward by status
     List<MunicipalProject> findByWardIdAndStatus(Long wardId, ProjectStatus status);
 

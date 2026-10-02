@@ -1,6 +1,12 @@
-import { useEffect, useRef, useState } from 'react'
+import { useCallback, useEffect, useRef, useState } from 'react'
 import FieldUpdateForm from '../components/FieldUpdateForm'
 import api from '../api/axios'
+import { getSession } from '../auth/session'
+import { API_BASE_URL, WS_URL } from '../config/backend'
+import L from 'leaflet'
+import 'leaflet/dist/leaflet.css'
+import SockJS from 'sockjs-client/dist/sockjs'
+import { Client } from '@stomp/stompjs'
 
 const STATUS_COLOR = {
   SANCTIONED:  '#854D0E',
@@ -29,99 +35,221 @@ function statusBadge(s) {
   return <span className={`badge ${map[s] || 'badge-sanc'}`}>{STATUS_LABEL[s] || s}</span>
 }
 
+const DELAY_RISK_LABEL = {
+  ON_TRACK: 'On track',
+  AT_RISK: 'At risk',
+  HIGH_DELAY_RISK: 'High delay risk',
+}
+const PRIORITY_STYLE = {
+  LOW: { background: 'var(--green-lt)', color: 'var(--green)' },
+  MEDIUM: { background: 'var(--amber-lt)', color: 'var(--amber)' },
+  HIGH: { background: 'var(--red-lt)', color: 'var(--red)' },
+  CRITICAL: { background: 'var(--red-lt)', color: 'var(--red)', fontWeight: 600 },
+}
+
+const DELAY_RISK_STYLE = {
+  ON_TRACK: { background: 'var(--green-lt)', color: 'var(--green)' },
+  AT_RISK: { background: 'var(--amber-lt)', color: 'var(--amber)' },
+  HIGH_DELAY_RISK: { background: 'var(--red-lt)', color: 'var(--red)' },
+}
+
+function formatScore(value) {
+  if (value === null || value === undefined || value === '') return 'Unavailable'
+  const score = Number(value)
+  return Number.isFinite(score) ? score.toFixed(1) : 'Unavailable'
+}
+
+function hasScore(value) {
+  return value !== null && value !== undefined && value !== '' && Number.isFinite(Number(value))
+}
+
+function formatProgress(value) {
+  if (!Number.isFinite(value)) return 'Unavailable'
+  return `${Number(value.toFixed(2))}%`
+}
+
 export default function MapView() {
   const mapRef      = useRef(null)
   const mapInstance = useRef(null)
   const markersRef  = useRef([])
   const stompRef    = useRef(null)
+  const fetchSequence = useRef(0)
+  const centeredWardRef = useRef(null)
 
   const [projects, setProjects]   = useState([])
-  const [selected, setSelected]   = useState(null)
+  const [selectedId, setSelectedId] = useState(null)
   const [filter, setFilter]       = useState('all')
   const [typeFilter, setTypeFilter] = useState('all')
   const [loading, setLoading]     = useState(true)
+  const [loadError, setLoadError] = useState('')
   const [wsStatus, setWsStatus]   = useState('connecting')
   const [showUpdateForm, setShowUpdateForm] = useState(false)
+  const [delayRisk, setDelayRisk] = useState(null)
+  const [delayRiskLoading, setDelayRiskLoading] = useState(false)
+  const [delayRiskError, setDelayRiskError] = useState('')
+  const [priority, setPriority] = useState(null)
+  const [priorityLoading, setPriorityLoading] = useState(false)
+  const [priorityError, setPriorityError] = useState('')
+  const [priorityRetry, setPriorityRetry] = useState(0)
+  const [linkedComplaints, setLinkedComplaints] = useState([])
+  const [linkedComplaintsLoading, setLinkedComplaintsLoading] = useState(false)
+  const [linkedComplaintsError, setLinkedComplaintsError] = useState('')
+  const [updateSuccess, setUpdateSuccess] = useState('')
+  const [delayRiskRetry, setDelayRiskRetry] = useState(0)
+  const [complaintsRetry, setComplaintsRetry] = useState(0)
   
   
 
   // Get wardId from logged-in user
-  const user   = JSON.parse(localStorage.getItem('user') || '{}')
-  const wardId = user.wardId || 2
+  const user   = getSession()?.user || {}
+  const wardId = Number.isInteger(user.wardId) && user.wardId > 0 ? user.wardId : null
   const canUpdateStatus = ['FIELD_WORKER', 'WARD_OFFICER', 'MUNICIPAL_ADMIN'].includes(user.role)
+  const selected = projects.find(project => project.id === selectedId) || null
+
+  const loadProjects = useCallback(async (showLoading = false) => {
+    if (!wardId) {
+      setLoading(false)
+      setProjects([])
+      setLoadError('')
+      return
+    }
+    const sequence = ++fetchSequence.current
+    if (showLoading) setLoading(true)
+    try {
+      const res = await api.get(`/api/projects/ward/${wardId}`)
+      if (sequence === fetchSequence.current) {
+        setProjects(res.data)
+        setLoadError('')
+        setLoading(false)
+      }
+    } catch (err) {
+      console.error('Failed to load projects:', err)
+      if (sequence === fetchSequence.current) {
+        setLoadError('Projects could not be loaded. Please try again.')
+        setLoading(false)
+      }
+      throw err
+    }
+  }, [wardId])
 
   // ── Fetch projects from backend ──────────
   useEffect(() => {
-    setLoading(true)
-    api.get(`/api/projects/ward/${wardId}`)
-      .then(res => {
-        setProjects(res.data)
-        setLoading(false)
+    loadProjects(true).catch(() => {})
+  }, [loadProjects])
+
+  useEffect(() => {
+    if (!selected) {
+      setDelayRisk(null)
+      setDelayRiskError('')
+      setDelayRiskLoading(false)
+      return
+    }
+
+    let cancelled = false
+    setDelayRiskLoading(true)
+    setDelayRiskError('')
+    api.get(`/api/projects/${selected.id}/delay-risk`)
+      .then(({ data }) => {
+        if (!cancelled) setDelayRisk(data)
       })
-      .catch(err => {
-        console.error('Failed to load projects:', err)
-        setLoading(false)
+      .catch(() => {
+        if (!cancelled) {
+          setDelayRisk(null)
+          setDelayRiskError('Delay risk could not be calculated.')
+        }
       })
-  }, [wardId])
+      .finally(() => {
+        if (!cancelled) setDelayRiskLoading(false)
+      })
+
+    return () => { cancelled = true }
+  }, [selected, delayRiskRetry])
+
+  useEffect(() => {
+    if (!selected) {
+      setPriority(null); setPriorityError(''); setPriorityLoading(false)
+      return
+    }
+    let cancelled = false
+    setPriorityLoading(true); setPriorityError('')
+    api.get(`/api/projects/${selected.id}/priority`)
+      .then(({ data }) => { if (!cancelled) setPriority(data) })
+      .catch(() => {
+        if (!cancelled) {
+          setPriority(null)
+          setPriorityError('Priority score could not be calculated.')
+        }
+      })
+      .finally(() => { if (!cancelled) setPriorityLoading(false) })
+    return () => { cancelled = true }
+  }, [selected, priorityRetry])
+
+  useEffect(() => {
+    if (!selected) {
+      setLinkedComplaints([]); setLinkedComplaintsError(''); setLinkedComplaintsLoading(false)
+      return
+    }
+    let cancelled = false
+    setLinkedComplaintsLoading(true); setLinkedComplaintsError('')
+    api.get(`/api/projects/${selected.id}/complaints`)
+      .then(({ data }) => { if (!cancelled) setLinkedComplaints(data) })
+      .catch(() => {
+        if (!cancelled) {
+          setLinkedComplaints([])
+          setLinkedComplaintsError('Linked complaints could not be loaded.')
+        }
+      })
+      .finally(() => { if (!cancelled) setLinkedComplaintsLoading(false) })
+    return () => { cancelled = true }
+  }, [selected, complaintsRetry])
 
   // ── WebSocket connection ─────────────────
   useEffect(() => {
     const token = localStorage.getItem('token')
-    if (!token) return
+    if (!token || !wardId) {
+      setWsStatus('disconnected')
+      return
+    }
 
-    // Dynamically import SockJS and STOMP
-    import('@stomp/stompjs').then(({ Client }) => {
-      const SockJS = window.SockJS
-
-      const client = new Client({
-        webSocketFactory: () => new SockJS('http://localhost:8080/ws'),
-        connectHeaders: {},
+    const client = new Client({
+        webSocketFactory: () => new SockJS(WS_URL),
+        connectHeaders: { Authorization: `Bearer ${token}` },
+        beforeConnect: () => setWsStatus('connecting'),
         onConnect: () => {
           setWsStatus('connected')
+          loadProjects().catch(() => {})
           // Subscribe to ward's project updates
           client.subscribe(
             `/topic/ward/${wardId}/projects`,
             message => {
-              const update = JSON.parse(message.body)
-              // Update the project in state when WebSocket fires
-              setProjects(prev =>
-                prev.map(p =>
-                  p.id === update.projectId
-                    ? {
-                        ...p,
-                        status: update.status,
-                        progressPercentage: update.progressPercentage,
-                        flagged: update.flagged,
-                      }
-                    : p
-                )
-              )
+              JSON.parse(message.body)
+              loadProjects().catch(() => {})
             }
           )
         },
         onDisconnect: () => setWsStatus('disconnected'),
         onStompError: () => setWsStatus('error'),
+        onWebSocketError: () => setWsStatus('error'),
+        onWebSocketClose: () => setWsStatus('disconnected'),
         reconnectDelay: 5000,
-      })
-
-      client.activate()
-      stompRef.current = client
     })
+    client.activate()
+    stompRef.current = client
 
     return () => {
-      if (stompRef.current) stompRef.current.deactivate()
+      client.deactivate()
+      if (stompRef.current === client) stompRef.current = null
     }
-  }, [wardId])
+  }, [wardId, loadProjects])
 
   // ── Init Leaflet map ─────────────────────
   useEffect(() => {
     if (mapInstance.current) return
-    const L = window.L
-    if (!L || !mapRef.current) return
+    if (!mapRef.current) return
 
     const map = L.map(mapRef.current, {
-      center: [28.7180, 77.1120],
-      zoom: 14,
+      center: [20.5937, 78.9629],
+      zoom: 5,
     })
 
     L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
@@ -130,12 +258,34 @@ export default function MapView() {
     }).addTo(map)
 
     mapInstance.current = map
+    return () => {
+      markersRef.current = []
+      map.remove()
+      if (mapInstance.current === map) mapInstance.current = null
+    }
   }, [])
+
+  useEffect(() => {
+    if (!wardId || !mapInstance.current || centeredWardRef.current === wardId) return
+    const project = projects.find(item => Number.isFinite(item.latitude) && Number.isFinite(item.longitude))
+    if (project) {
+      mapInstance.current.setView([project.latitude, project.longitude], 14)
+      centeredWardRef.current = wardId
+      return
+    }
+    let cancelled = false
+    api.get(`/api/wards/${wardId}`).then(({ data }) => {
+      if (!cancelled && Number.isFinite(data.centerLatitude) && Number.isFinite(data.centerLongitude)) {
+        mapInstance.current?.setView([data.centerLatitude, data.centerLongitude], 14)
+        centeredWardRef.current = wardId
+      }
+    }).catch(() => {})
+    return () => { cancelled = true }
+  }, [wardId, projects])
 
   // ── Render markers when projects change ──
   useEffect(() => {
-    const L = window.L
-    if (!L || !mapInstance.current) return
+    if (!mapInstance.current) return
 
     // Remove old markers
     markersRef.current.forEach(m => m.remove())
@@ -149,40 +299,35 @@ export default function MapView() {
 
     filtered.forEach(project => {
       // Skip if no coordinates
-      if (!project.latitude || !project.longitude) return
+      if (!Number.isFinite(project.latitude) || !Number.isFinite(project.longitude)) return
 
       const color = STATUS_COLOR[project.status] || '#52575E'
 
+      const markerElement = document.createElement('div')
+      markerElement.title = project.projectName || ''
+      Object.assign(markerElement.style, {
+        width: '28px', height: '28px', borderRadius: '50% 50% 50% 0',
+        transform: 'rotate(-45deg)', background: color, border: '2.5px solid white',
+        boxShadow: '0 2px 6px rgba(0,0,0,0.35)', cursor: 'pointer', position: 'relative',
+      })
+      const center = document.createElement('div')
+      Object.assign(center.style, {
+        width: '10px', height: '10px', background: 'rgba(255,255,255,0.85)',
+        borderRadius: '50%', position: 'absolute', top: '50%', left: '50%',
+        transform: 'translate(-50%,-50%)',
+      })
+      markerElement.appendChild(center)
+
       const icon = L.divIcon({
         className: '',
-        html: `
-          <div title="${project.projectName}" style="
-            width: 28px; height: 28px;
-            border-radius: 50% 50% 50% 0;
-            transform: rotate(-45deg);
-            background: ${color};
-            border: 2.5px solid white;
-            box-shadow: 0 2px 6px rgba(0,0,0,0.35);
-            cursor: pointer;
-            position: relative;
-          ">
-            <div style="
-              width: 10px; height: 10px;
-              background: rgba(255,255,255,0.85);
-              border-radius: 50%;
-              position: absolute;
-              top: 50%; left: 50%;
-              transform: translate(-50%,-50%);
-            "></div>
-          </div>
-        `,
+        html: markerElement,
         iconSize: [28, 28],
         iconAnchor: [14, 28],
       })
 
       const marker = L.marker([project.latitude, project.longitude], { icon })
         .addTo(mapInstance.current)
-        .on('click', () => setSelected(project))
+        .on('click', () => setSelectedId(project.id))
 
       markersRef.current.push(marker)
     })
@@ -197,14 +342,14 @@ export default function MapView() {
   const types = ['all', ...new Set(projects.map(p => p.projectType).filter(Boolean))]
 
   return (
-    <div style={{
+    <div className="map-page" style={{
       display: 'flex', flexDirection: 'column',
       height: 'calc(100vh - 46px)',
       margin: '-20px -24px'
     }}>
 
       {/* Toolbar */}
-      <div style={{
+      <div className="map-toolbar" style={{
         background: 'var(--bg-surface)',
         borderBottom: '1px solid var(--border)',
         padding: '8px 16px',
@@ -323,7 +468,26 @@ export default function MapView() {
         </div>
 
         {/* Empty state */}
-        {!loading && projects.length === 0 && (
+        {!loading && !wardId && (
+          <div style={{
+            position: 'absolute', top: '50%', left: '50%', transform: 'translate(-50%,-50%)',
+            zIndex: 500, background: 'var(--bg-surface)', border: '1px solid var(--border)',
+            borderRadius: 'var(--r-lg)', padding: '24px 32px', textAlign: 'center'
+          }}>
+            <div style={{ fontSize: 13, fontWeight: 500 }}>No ward is assigned to this account</div>
+          </div>
+        )}
+        {!loading && loadError && (
+          <div style={{
+            position: 'absolute', top: 16, left: '50%', transform: 'translateX(-50%)', zIndex: 1000,
+            background: 'var(--red-lt)', border: '1px solid #FCA5A5', color: 'var(--red)',
+            borderRadius: 'var(--r-md)', padding: '8px 12px', fontSize: 12.5
+          }} role="alert">
+            {loadError} <button className="btn btn-ghost btn-sm"
+              onClick={() => loadProjects(true).catch(() => {})}>Retry</button>
+          </div>
+        )}
+        {!loading && !loadError && wardId && projects.length === 0 && (
           <div style={{
             position: 'absolute', top: '50%', left: '50%',
             transform: 'translate(-50%,-50%)', zIndex: 500,
@@ -340,10 +504,16 @@ export default function MapView() {
             </div>
           </div>
         )}
+        {!loading && !loadError && projects.length > 0 && filteredProjects.length === 0 && (
+          <div className="map-empty-overlay">
+            <div style={{ fontSize: 13, fontWeight: 500, marginBottom: 4 }}>No projects match these filters</div>
+            <button className="btn btn-sm" onClick={() => { setFilter('all'); setTypeFilter('all') }}>Clear filters</button>
+          </div>
+        )}
 
         {/* Detail panel */}
         {selected && (
-          <div style={{
+          <div className="map-detail-panel" style={{
             width: 320, flexShrink: 0,
             background: 'var(--bg-surface)',
             borderLeft: '1px solid var(--border)',
@@ -368,7 +538,7 @@ export default function MapView() {
                   </div>
                 </div>
                 <button
-                  onClick={() => setSelected(null)}
+                  onClick={() => setSelectedId(null)}
                   style={{
                     background: 'none', border: 'none',
                     color: '#6B7280', cursor: 'pointer',
@@ -413,6 +583,132 @@ export default function MapView() {
                 </div>
               </div>
 
+              <div style={{
+                border: '1px solid var(--border)', borderRadius: 'var(--r-md)',
+                padding: '10px 12px', background: 'var(--bg-hover)'
+              }}>
+                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 6 }}>
+                  <span className="t-label">Advisory priority</span>
+                  {priorityLoading && <span className="t-caption">Calculating...</span>}
+                  {!priorityLoading && priority && (
+                    <span className="badge" style={PRIORITY_STYLE[priority.priorityLevel]}>
+                      {priority.priorityLevel}
+                    </span>
+                  )}
+                </div>
+                {priorityError ? (
+                  <div style={{ fontSize: 11.5, color: 'var(--red)' }} role="alert">
+                    {priorityError} <button className="btn btn-ghost btn-sm"
+                      onClick={() => setPriorityRetry(value => value + 1)}>Retry</button>
+                  </div>
+                ) : !priorityLoading && priority && (
+                  <>
+                    <div style={{ fontSize: 18, fontWeight: 500 }}>{formatScore(priority.totalScore)}{hasScore(priority.totalScore) ? ' / 100' : ''}</div>
+                    <div className="t-caption">Decision-support score; not an official government formula.</div>
+                  </>
+                )}
+              </div>
+
+              {/* Rule-based delay risk */}
+              <div style={{
+                border: '1px solid var(--border)',
+                borderRadius: 'var(--r-md)', padding: '10px 12px',
+                background: 'var(--bg-hover)'
+              }}>
+                <div style={{
+                  display: 'flex', justifyContent: 'space-between',
+                  alignItems: 'center', marginBottom: 8
+                }}>
+                  <span className="t-label">Delay risk</span>
+                  {delayRiskLoading && (
+                    <span style={{ fontSize: 11, color: 'var(--text-muted)' }}>Calculating...</span>
+                  )}
+                  {!delayRiskLoading && delayRisk?.available && (
+                    <span className="badge" style={DELAY_RISK_STYLE[delayRisk.delayRisk]}>
+                      {DELAY_RISK_LABEL[delayRisk.delayRisk] || delayRisk.delayRisk}
+                    </span>
+                  )}
+                  {!delayRiskLoading && delayRisk && !delayRisk.available && (
+                    <span className="badge badge-sanc">Unavailable</span>
+                  )}
+                </div>
+
+                {delayRiskError ? (
+                  <div style={{ fontSize: 11.5, color: 'var(--red)' }} role="alert">
+                    {delayRiskError} <button className="btn btn-ghost btn-sm"
+                      onClick={() => setDelayRiskRetry(value => value + 1)}>Retry</button>
+                  </div>
+                ) : !delayRiskLoading && delayRisk && (
+                  <>
+                    <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '6px 12px' }}>
+                      {[
+                        ['Expected progress', formatProgress(delayRisk.expectedProgress)],
+                        ['Actual progress', formatProgress(delayRisk.actualProgress)],
+                        ['Progress gap', formatProgress(delayRisk.progressGap)],
+                        ['Deadline', delayRisk.overdue ? 'Passed' : 'Not passed'],
+                      ].map(([label, value]) => (
+                        <div key={label}>
+                          <div style={{ fontSize: 10.5, color: 'var(--text-muted)' }}>{label}</div>
+                          <div style={{ fontSize: 12, fontWeight: 500, color: 'var(--text-primary)' }}>
+                            {value}
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+                    <div style={{
+                      fontSize: 11, color: 'var(--text-secondary)', lineHeight: 1.5,
+                      marginTop: 8, paddingTop: 8, borderTop: '1px solid var(--border)'
+                    }}>
+                      {delayRisk.reason}
+                    </div>
+                  </>
+                )}
+              </div>
+
+              {/* Linked complaints */}
+              <div>
+                <div className="t-label" style={{ marginBottom: 6 }}>
+                  Linked complaints {linkedComplaints.length > 0 ? `(${linkedComplaints.length})` : ''}
+                </div>
+                {linkedComplaintsLoading && <div className="t-caption">Loading linked complaints...</div>}
+                {linkedComplaintsError && (
+                  <div style={{ fontSize: 11.5, color: 'var(--red)' }} role="alert">
+                    {linkedComplaintsError} <button className="btn btn-ghost btn-sm"
+                      onClick={() => setComplaintsRetry(value => value + 1)}>Retry</button>
+                  </div>
+                )}
+                {!linkedComplaintsLoading && !linkedComplaintsError && linkedComplaints.length === 0 && (
+                  <div className="t-caption">No complaints are linked to this work.</div>
+                )}
+                {linkedComplaints.length > 0 && (
+                  <div style={{ display: 'flex', flexDirection: 'column', gap: 6, maxHeight: 260, overflowY: 'auto' }}>
+                    {linkedComplaints.map(complaint => (
+                      <div key={complaint.id} style={{
+                        border: '1px solid var(--border)', borderRadius: 'var(--r-md)',
+                        padding: 8, display: 'flex', gap: 8
+                      }}>
+                        {complaint.imageUrl && (
+                          <img src={complaint.imageUrl.startsWith('http')
+                            ? complaint.imageUrl : `${API_BASE_URL}${complaint.imageUrl}`}
+                            alt="Municipal complaint" style={{
+                              width: 48, height: 48, objectFit: 'cover', borderRadius: 'var(--r-sm)'
+                            }} />
+                        )}
+                        <div style={{ minWidth: 0 }}>
+                          <div style={{ fontSize: 11.5, fontWeight: 500 }}>
+                            #{complaint.id} · {complaint.finalIssueType?.replaceAll('_', ' ')}
+                          </div>
+                          <div className="t-caption">{complaint.finalSeverity} · {complaint.locationAddress}</div>
+                          <div style={{ fontSize: 11, color: 'var(--text-secondary)', marginTop: 2 }}>
+                            {complaint.description}
+                          </div>
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                )}
+              </div>
+
               {/* Details grid */}
               <div style={{
                 border: '1px solid var(--border)',
@@ -424,7 +720,7 @@ export default function MapView() {
                   ['Budget spent', `₹${selected.budgetSpent?.toLocaleString('en-IN')}`],
                   ['Start date', selected.startDate],
                   ['Due date', selected.expectedEndDate || 'Not set'],
-                  ['Coordinates', selected.latitude && selected.longitude
+                  ['Coordinates', Number.isFinite(selected.latitude) && Number.isFinite(selected.longitude)
                     ? `${selected.latitude.toFixed(4)}, ${selected.longitude.toFixed(4)}`
                     : 'Not set'
                   ],
@@ -465,7 +761,7 @@ export default function MapView() {
                {canUpdateStatus && (
                   <button
                     className="btn btn-primary btn-sm w-full"
-                    onClick={() => setShowUpdateForm(true)}
+                    onClick={() => { setUpdateSuccess(''); setShowUpdateForm(true) }}
                   >
                     📝 Log progress update
                   </button>
@@ -483,15 +779,19 @@ export default function MapView() {
           <FieldUpdateForm
             project={selected}
             onClose={() => setShowUpdateForm(false)}
-            onUpdated={() => {
-              api.get(`/api/projects/ward/${wardId}`)
-                .then(res => setProjects(res.data))
-
-              setSelected(null)
-              setShowUpdateForm(false)
+            onUpdated={({ status, photoCount }) => {
+              loadProjects(false).catch(() => {})
+              setUpdateSuccess(`Project updated to ${STATUS_LABEL[status] || status}${photoCount ? ` with ${photoCount} photo${photoCount === 1 ? '' : 's'}` : ''}.`)
+              setSelectedId(null)
             }}
           />
-        )}        
+        )}
+        {updateSuccess && (
+          <div className="map-success-notice" role="status">
+            <span>{updateSuccess}</span>
+            <button className="btn btn-ghost btn-sm" onClick={() => setUpdateSuccess('')}>Dismiss</button>
+          </div>
+        )}
       </div>
     </div>
   )

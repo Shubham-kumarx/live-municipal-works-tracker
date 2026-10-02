@@ -47,7 +47,7 @@ function WorkOrderDetail({ order, onClose }) {
       display: 'flex', alignItems: 'flex-start',
       justifyContent: 'flex-end'
     }} onClick={onClose}>
-      <div style={{
+      <div className="work-order-drawer" style={{
         width: 540, height: '100vh',
         background: 'var(--bg-surface)',
         borderLeft: '1px solid var(--border)',
@@ -134,7 +134,7 @@ function WorkOrderDetail({ order, onClose }) {
           </div>
 
           {/* Details grid */}
-          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 0,
+          <div className="work-order-detail-grid" style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 0,
             border: '1px solid var(--border)', borderRadius: 'var(--r-lg)',
             overflow: 'hidden', marginBottom: 20 }}>
             {[
@@ -222,7 +222,7 @@ export default function WorkOrders() {
   })
 
   return (
-    <div>
+    <div className="operational-page">
       {selected && (
         <WorkOrderDetail order={selected} onClose={() => setSelected(null)} />
       )}
@@ -231,7 +231,7 @@ export default function WorkOrders() {
         <div className="page-header-left">
           <h1 className="t-page">Work Orders</h1>
           <span className="t-caption">
-            {ORDERS.length} total · {ORDERS.filter(o => o.status === 'overdue').length} overdue
+            Sample data · {ORDERS.length} example orders · {ORDERS.filter(o => o.status === 'overdue').length} marked overdue
           </span>
         </div>
         <div className="flex-center gap-8">
@@ -293,7 +293,7 @@ export default function WorkOrders() {
 
       {/* Table */}
       <div className="panel">
-        <div style={{ overflowX: 'auto' }}>
+        <div className="operational-table" style={{ overflowX: 'auto' }}>
           <table className="data-table">
             <thead>
               <tr>

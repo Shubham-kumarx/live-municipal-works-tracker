@@ -1,6 +1,7 @@
 import { useState } from 'react'
 import { useNavigate, Link } from 'react-router-dom'
-import axios from 'axios'
+import { landingPath } from '../auth/session'
+import api from '../api/axios'
 
 export default function Login() {
   const navigate = useNavigate()
@@ -12,17 +13,15 @@ export default function Login() {
     e.preventDefault()
     setError('')
 
-    if (!form.email || !form.password) {
+    const email = form.email.trim().toLowerCase()
+    if (!email || !form.password) {
       setError('Email and password are required')
       return
     }
 
     setLoading(true)
     try {
-      const res = await axios.post(
-        'http://localhost:8080/api/auth/login',
-        form
-      )
+      const res = await api.post('/api/auth/login', { email, password: form.password })
       localStorage.setItem('token', res.data.token)
       localStorage.setItem('user', JSON.stringify({
         email: res.data.email,
@@ -30,7 +29,7 @@ export default function Login() {
         role: res.data.role,
         wardId: res.data.wardId,
       }))
-      navigate('/dashboard')
+      navigate(landingPath(res.data.role))
     } catch (err) {
       setError(
         err.response?.data?.message ||
@@ -42,15 +41,14 @@ export default function Login() {
   }
 
   return (
-    <div style={{
+    <div className="auth-page" style={{
       height: '100vh',
       display: 'grid',
-      gridTemplateColumns: '1fr 420px',
       background: '#F2F1EE'
     }}>
 
       {/* Left — branding panel */}
-      <div style={{
+      <div className="auth-brand-panel" style={{
         background: '#1C1F24',
         display: 'flex',
         flexDirection: 'column',
@@ -83,11 +81,12 @@ export default function Login() {
           </div>
         </div>
 
-        {/* Stats row */}
+        {/* Sample stats row */}
         <div style={{
           display: 'grid', gridTemplateColumns: 'repeat(3,1fr)',
           gap: 0, borderTop: '1px solid #2E3238', paddingTop: 32
         }}>
+          <div style={{ gridColumn: '1 / -1', fontSize: 10, color: '#6B7280', marginBottom: 8 }}>Sample interface metrics</div>
           {[
             { num: '14', label: 'Wards covered' },
             { num: '340+', label: 'Active work orders' },
@@ -104,7 +103,7 @@ export default function Login() {
       </div>
 
       {/* Right — login form */}
-      <div style={{
+      <div className="auth-form-panel" style={{
         display: 'flex', flexDirection: 'column',
         justifyContent: 'center', padding: '48px 40px',
         background: '#FFFFFF',
@@ -133,6 +132,7 @@ export default function Login() {
               value={form.email}
               onChange={e => setForm({ ...form, email: e.target.value })}
               autoComplete="email"
+              required
               disabled={loading}
             />
           </div>
@@ -143,10 +143,6 @@ export default function Login() {
               <label style={{ fontSize: 12, fontWeight: 500, color: '#52575E' }}>
                 Password
               </label>
-              <button type="button" className="btn btn-ghost btn-sm"
-                style={{ padding: 0, fontSize: 12, color: '#1A4B6E' }}>
-                Forgot password?
-              </button>
             </div>
             <input
               className="input"
@@ -155,13 +151,14 @@ export default function Login() {
               value={form.password}
               onChange={e => setForm({ ...form, password: e.target.value })}
               autoComplete="current-password"
+              required
               disabled={loading}
             />
           </div>
 
           {/* Error */}
           {error && (
-            <div style={{
+            <div role="alert" style={{
               padding: '8px 12px',
               background: '#FDE8E8',
               border: '1px solid #FCA5A5',
@@ -188,42 +185,6 @@ export default function Login() {
           </button>
 
         </form>
-
-        {/* Demo accounts */}
-        <div style={{
-          marginTop: 28,
-          padding: '14px 16px',
-          background: '#F7F6F3',
-          border: '1px solid #E2E0DB',
-          borderRadius: 'var(--r-lg)'
-        }}>
-          <div style={{ fontSize: 11, fontWeight: 500, color: '#8A8F98',
-            textTransform: 'uppercase', letterSpacing: '.5px', marginBottom: 10 }}>
-            Demo accounts
-          </div>
-          {[
-            { label: 'Municipal Admin', email: 'shubham@gmail.com', pass: 'secret123' },
-            { label: 'Ward Officer', email: 'officer@gmail.com', pass: 'officer123' },
-            { label: 'Field Worker', email: 'worker@gmail.com', pass: 'worker123' },
-          ].map(acc => (
-            <div
-              key={acc.email}
-              style={{
-                display: 'flex', justifyContent: 'space-between',
-                alignItems: 'center', padding: '6px 0',
-                borderBottom: '1px solid #E2E0DB',
-                cursor: 'pointer'
-              }}
-              onClick={() => setForm({ email: acc.email, password: acc.pass })}
-            >
-              <div>
-                <div style={{ fontSize: 12, fontWeight: 500, color: '#1C1F24' }}>{acc.label}</div>
-                <div style={{ fontSize: 11, color: '#8A8F98' }}>{acc.email}</div>
-              </div>
-              <span style={{ fontSize: 11, color: '#1A4B6E', fontWeight: 500 }}>Use →</span>
-            </div>
-          ))}
-        </div>
 
         {/* Footer */}
         <div style={{ marginTop: 24, fontSize: 11.5, color: '#8A8F98', textAlign: 'center' }}>

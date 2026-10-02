@@ -1,17 +1,23 @@
 package com.municipal.tracker.controller;
 import com.municipal.tracker.model.Ward;
+import com.municipal.tracker.model.User;
+import com.municipal.tracker.dto.WardWriteRequest;
+import com.municipal.tracker.service.ProjectAccessService;
 import com.municipal.tracker.service.WardService;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
+import org.springframework.security.access.prepost.PreAuthorize;
+import org.springframework.security.core.annotation.AuthenticationPrincipal;
+import jakarta.validation.Valid;
 import org.springframework.web.bind.annotation.*;
 import java.util.List;
 @RestController
 @RequestMapping("/api/wards")
 @RequiredArgsConstructor
-@CrossOrigin(origins = "*")
 public class WardController {
     private final WardService wardService;
+    private final ProjectAccessService projectAccessService;
 
     @GetMapping
     public ResponseEntity<List<Ward>> getAllActiveWards(){ // get all active wards
@@ -34,30 +40,23 @@ public class WardController {
                 .orElse(ResponseEntity.notFound().build());
     }
     @PostMapping // post create a new ward
-    public ResponseEntity<Ward> createWard(@RequestBody Ward ward){
-        try{
-            Ward created = wardService.createWard(ward);
-            return ResponseEntity.status(HttpStatus.CREATED).body(created);
-        } catch(RuntimeException e){
-            return ResponseEntity.badRequest().build();
-        }
+    @PreAuthorize("hasRole('MUNICIPAL_ADMIN')")
+    public ResponseEntity<Ward> createWard(@Valid @RequestBody WardWriteRequest request){
+        Ward created = wardService.createWard(request.toEntity());
+        return ResponseEntity.status(HttpStatus.CREATED).body(created);
     }
     @PutMapping("/{id}") // update ward by id
-    public ResponseEntity<Ward> updateWard(@PathVariable Long id, @RequestBody Ward ward){
-        try {
-            Ward updated = wardService.updateWard(id, ward);
-            return ResponseEntity.ok(updated);
-        } catch (RuntimeException e) {
-            return ResponseEntity.notFound().build();
-        }
+    @PreAuthorize("hasAnyRole('MUNICIPAL_ADMIN','WARD_OFFICER')")
+    public ResponseEntity<Ward> updateWard(@PathVariable Long id, @Valid @RequestBody WardWriteRequest request,
+                                            @AuthenticationPrincipal User currentUser){
+        projectAccessService.requireWardAccess(currentUser, id);
+        Ward updated = wardService.updateWard(id, request.toEntity());
+        return ResponseEntity.ok(updated);
     }
     @DeleteMapping("/{id}") // soft deleting a ward
+    @PreAuthorize("hasRole('MUNICIPAL_ADMIN')")
     public ResponseEntity<Void> deactivateWard(@PathVariable long id){
-        try{
-            wardService.deactivateWard(id);
-            return ResponseEntity.ok().build();
-        } catch (RuntimeException e) {
-            return ResponseEntity.notFound().build();
-        }
+        wardService.deactivateWard(id);
+        return ResponseEntity.ok().build();
     }
 }

@@ -13,6 +13,10 @@ import org.springframework.security.authentication.AuthenticationManager;
 import org.springframework.security.authentication.UsernamePasswordAuthenticationToken;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Service;
+import org.springframework.security.access.AccessDeniedException;
+import org.springframework.web.server.ResponseStatusException;
+import static org.springframework.http.HttpStatus.CONFLICT;
+import static org.springframework.http.HttpStatus.NOT_FOUND;
 
 @Service
 @RequiredArgsConstructor
@@ -29,14 +33,14 @@ public class AuthService {
 
         // Check if email already exists
         if (userRepository.existsByEmail(request.getEmail())) {
-            throw new RuntimeException("Email already registered: " + request.getEmail());
+            throw new ResponseStatusException(CONFLICT, "Email is already registered");
         }
 
         // Find ward if wardId provided
         Ward ward = null;
         if (request.getWardId() != null) {
             ward = wardRepository.findById(request.getWardId())
-                    .orElseThrow(() -> new RuntimeException(
+                    .orElseThrow(() -> new ResponseStatusException(NOT_FOUND,
                             "Ward not found with id: " + request.getWardId()
                     ));
         }
@@ -67,6 +71,17 @@ public class AuthService {
         );
     }
 
+    public AuthResponse registerStaff(RegisterRequest request, User actor) {
+        if (actor == null) throw new AccessDeniedException("Authentication required");
+        if (actor.getRole() == com.municipal.tracker.model.Role.WARD_OFFICER) {
+            if (actor.getWard() == null || request.getWardId() == null
+                    || !actor.getWard().getId().equals(request.getWardId())) {
+                throw new AccessDeniedException("Ward officers can create staff only in their ward");
+            }
+        }
+        return register(request);
+    }
+
     // ── LOGIN ──────────────────────────────────────
     public AuthResponse login(LoginRequest request) {
 
@@ -81,7 +96,7 @@ public class AuthService {
 
         // If we reach here — credentials are correct
         User user = userRepository.findByEmail(request.getEmail())
-                .orElseThrow(() -> new RuntimeException("User not found"));
+                .orElseThrow(() -> new IllegalArgumentException("User not found"));
 
         // Generate JWT token
         String token = jwtUtil.generateToken(user);

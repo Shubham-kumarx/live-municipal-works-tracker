@@ -1,18 +1,29 @@
 import { useState, useRef } from 'react'
 import api from '../api/axios'
 
+const MAX_PHOTO_BYTES = 10 * 1024 * 1024
+const MAX_PHOTOS = 3
+const ACCEPTED_PHOTO_TYPES = ['image/jpeg', 'image/png']
+
 export default function FieldUpdateForm({ project, onClose, onUpdated }) {
   const [status, setStatus] = useState(project.status)
   const [progress, setProgress] = useState(project.progressPercentage || 0)
   const [note, setNote] = useState('')
   const [photos, setPhotos] = useState([])
-  const [previews, setPreviews] = useState([])
   const [gps, setGps] = useState(null)
   const [gpsLoading, setGpsLoading] = useState(false)
   const [gpsError, setGpsError] = useState('')
   const [submitting, setSubmitting] = useState(false)
   const [error, setError] = useState('')
+  const [statusSaved, setStatusSaved] = useState(false)
   const fileRef = useRef()
+  const allowedStatuses = {
+    SANCTIONED: ['SANCTIONED', 'IN_PROGRESS', 'CANCELLED'],
+    IN_PROGRESS: ['IN_PROGRESS', 'DELAYED', 'COMPLETED', 'CANCELLED'],
+    DELAYED: ['DELAYED', 'IN_PROGRESS', 'COMPLETED', 'CANCELLED'],
+    COMPLETED: ['COMPLETED'],
+    CANCELLED: ['CANCELLED'],
+  }[project.status] || [project.status]
 
   // Auto-capture GPS
   function captureGPS() {
@@ -27,7 +38,7 @@ export default function FieldUpdateForm({ project, onClose, onUpdated }) {
         })
         setGpsLoading(false)
       },
-      err => {
+      () => {
         setGpsError('Location access denied. Please enable GPS.')
         setGpsLoading(false)
       },
@@ -38,36 +49,63 @@ export default function FieldUpdateForm({ project, onClose, onUpdated }) {
   // Handle photo selection
   function handlePhotoChange(e) {
     const files = Array.from(e.target.files)
-    setPhotos(prev => [...prev, ...files])
+    setError('')
+    if (photos.length + files.length > MAX_PHOTOS) {
+      setError(`Upload no more than ${MAX_PHOTOS} photos per update.`)
+      e.target.value = ''
+      return
+    }
+    const invalid = files.find(file => file.size === 0
+      || file.size > MAX_PHOTO_BYTES || !ACCEPTED_PHOTO_TYPES.includes(file.type))
+    if (invalid) {
+      setError('Each photo must be a non-empty JPEG or PNG no larger than 10 MB.')
+      e.target.value = ''
+      return
+    }
     files.forEach(file => {
       const reader = new FileReader()
-      reader.onload = ev => setPreviews(prev => [...prev, ev.target.result])
+      const id = crypto.randomUUID()
+      reader.onload = ev => setPhotos(prev => [...prev, { id, file, preview: ev.target.result }])
+      reader.onerror = () => setError(`Photo ${file.name} could not be read.`)
       reader.readAsDataURL(file)
     })
+    e.target.value = ''
   }
 
   function removePhoto(index) {
     setPhotos(prev => prev.filter((_, i) => i !== index))
-    setPreviews(prev => prev.filter((_, i) => i !== index))
   }
 
   async function handleSubmit(e) {
     e.preventDefault()
     setError('')
+    if (progress < 0 || progress > 100) {
+      setError('Progress must be between 0 and 100.')
+      return
+    }
+    if (note.trim().length > 5000) {
+      setError('Progress note must not exceed 5,000 characters.')
+      return
+    }
     setSubmitting(true)
+    let saved = statusSaved
 
     try {
       // 1. Update status and progress
-      await api.patch(`/api/projects/${project.id}/status`, {
-        status,
-        progressNote: note,
-        progressPercentage: progress
-      })
+      if (!statusSaved) {
+        await api.patch(`/api/projects/${project.id}/status`, {
+          status,
+          progressNote: note,
+          progressPercentage: progress
+        })
+        setStatusSaved(true)
+        saved = true
+      }
 
       // 2. Upload photos if any
       if (photos.length > 0) {
         const formData = new FormData()
-        photos.forEach(photo => formData.append('files', photo))
+        photos.forEach(photo => formData.append('files', photo.file))
         await api.post(
           `/api/upload/project/${project.id}/photos`,
           formData,
@@ -75,10 +113,12 @@ export default function FieldUpdateForm({ project, onClose, onUpdated }) {
         )
       }
 
-      onUpdated()
+      onUpdated({ status, photoCount: photos.length })
       onClose()
     } catch (err) {
-      setError(err.response?.data?.message || 'Update failed. Try again.')
+      setError(saved
+        ? `Status was saved, but photos failed: ${err.response?.data?.message || 'Try the upload again.'}`
+        : (err.response?.data?.message || 'Update failed. Try again.'))
     } finally {
       setSubmitting(false)
     }
@@ -113,7 +153,7 @@ export default function FieldUpdateForm({ project, onClose, onUpdated }) {
               {project.projectName}
             </div>
           </div>
-          <button className="btn btn-ghost btn-sm" onClick={onClose}>✕</button>
+          <button className="btn btn-ghost btn-sm" onClick={onClose} disabled={submitting}>✕</button>
         </div>
 
         <form onSubmit={handleSubmit} style={{ padding: 20, display: 'flex', flexDirection: 'column', gap: 18 }}>
@@ -121,7 +161,7 @@ export default function FieldUpdateForm({ project, onClose, onUpdated }) {
           {/* GPS Section */}
           <div>
             <div className="t-label" style={{ marginBottom: 8 }}>
-              Field location (GPS)
+              Location preview (GPS)
             </div>
             {gps ? (
               <div style={{
@@ -164,7 +204,7 @@ export default function FieldUpdateForm({ project, onClose, onUpdated }) {
                   </div>
                 )}
                 <div style={{ fontSize: 11, color: 'var(--text-muted)', marginTop: 5 }}>
-                  Browser will ask for location permission. GPS location is attached to this update.
+                  Browser permission is used only for this preview. Coordinates are not submitted or stored.
                 </div>
               </div>
             )}
@@ -178,12 +218,18 @@ export default function FieldUpdateForm({ project, onClose, onUpdated }) {
             <select
               className="input"
               value={status}
-              onChange={e => setStatus(e.target.value)}
+              onChange={e => {
+                setStatus(e.target.value)
+                if (e.target.value === 'COMPLETED') setProgress(100)
+              }}
+              disabled={submitting || statusSaved}
             >
-              <option value="SANCTIONED">Sanctioned (not started)</option>
-              <option value="IN_PROGRESS">In Progress</option>
-              <option value="COMPLETED">Completed</option>
-              <option value="DELAYED">Delayed</option>
+              {allowedStatuses.map(value => (
+                <option key={value} value={value}>
+                  {{ SANCTIONED: 'Sanctioned (not started)', IN_PROGRESS: 'In Progress',
+                    COMPLETED: 'Completed', DELAYED: 'Delayed', CANCELLED: 'Cancelled' }[value]}
+                </option>
+              ))}
             </select>
           </div>
 
@@ -203,6 +249,7 @@ export default function FieldUpdateForm({ project, onClose, onUpdated }) {
               min={0} max={100} step={5}
               value={progress}
               onChange={e => setProgress(Number(e.target.value))}
+              disabled={submitting || statusSaved || status === 'COMPLETED'}
               style={{ width: '100%', accentColor: 'var(--accent)' }}
             />
             <div style={{
@@ -237,6 +284,8 @@ export default function FieldUpdateForm({ project, onClose, onUpdated }) {
               placeholder="Describe what was done today, any issues faced..."
               value={note}
               onChange={e => setNote(e.target.value)}
+              maxLength={5000}
+              disabled={submitting || statusSaved}
               rows={3}
               style={{ height: 'auto', resize: 'vertical', padding: '8px 10px' }}
             />
@@ -252,11 +301,12 @@ export default function FieldUpdateForm({ project, onClose, onUpdated }) {
             <input
               ref={fileRef}
               type="file"
-              accept="image/*"
+              accept="image/jpeg,image/png,.jpg,.jpeg,.png"
               capture="environment"
               multiple
               style={{ display: 'none' }}
               onChange={handlePhotoChange}
+              disabled={submitting}
             />
 
             {/* Upload button */}
@@ -264,25 +314,26 @@ export default function FieldUpdateForm({ project, onClose, onUpdated }) {
               type="button"
               className="btn btn-sm"
               onClick={() => fileRef.current.click()}
+              disabled={submitting || photos.length >= MAX_PHOTOS}
               style={{ width: '100%', justifyContent: 'center', padding: '8px 0' }}
             >
               📷 Take photo / Upload from gallery
             </button>
 
             <div style={{ fontSize: 11, color: 'var(--text-muted)', marginTop: 5 }}>
-              On mobile, opens camera directly. On desktop, opens file picker.
+              JPEG or PNG, up to 10 MB each. Maximum {MAX_PHOTOS} photos.
             </div>
 
             {/* Photo previews */}
-            {previews.length > 0 && (
+            {photos.length > 0 && (
               <div style={{
                 display: 'grid', gridTemplateColumns: 'repeat(3,1fr)',
                 gap: 8, marginTop: 12
               }}>
-                {previews.map((src, i) => (
-                  <div key={i} style={{ position: 'relative' }}>
+                {photos.map((photo, i) => (
+                  <div key={photo.id} style={{ position: 'relative' }}>
                     <img
-                      src={src}
+                      src={photo.preview}
                       alt={`Photo ${i + 1}`}
                       style={{
                         width: '100%', aspectRatio: '1',
@@ -332,6 +383,7 @@ export default function FieldUpdateForm({ project, onClose, onUpdated }) {
               type="button"
               className="btn btn-sm"
               onClick={onClose}
+              disabled={submitting}
               style={{ flex: 1 }}
             >
               Cancel
