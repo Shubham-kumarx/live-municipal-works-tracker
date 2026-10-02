@@ -1,17 +1,18 @@
-import { Component } from 'react'
+import { Component, lazy, Suspense } from 'react'
 import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom'
 import Shell from './components/Shell'
-import Dashboard from './pages/Dashboard'
-import WorkOrders from './pages/WorkOrders'
-import MapView from './pages/MapView'
-import FieldTeams from './pages/FieldTeams'
-import Login from './pages/Login'
-import Register from './pages/Register'
-import AddStaff from './pages/AddStaff'
-import Complaints from './pages/Complaints'
-import AdminComplaints from './pages/AdminComplaints'
 import ProtectedRoute, { PublicOnlyRoute } from './components/ProtectedRoute'
 import { clearSession, getSession, landingPath } from './auth/session'
+
+const Dashboard = lazy(() => import('./pages/Dashboard'))
+const WorkOrders = lazy(() => import('./pages/WorkOrders'))
+const MapView = lazy(() => import('./pages/MapView'))
+const FieldTeams = lazy(() => import('./pages/FieldTeams'))
+const Login = lazy(() => import('./pages/Login'))
+const Register = lazy(() => import('./pages/Register'))
+const AddStaff = lazy(() => import('./pages/AddStaff'))
+const Complaints = lazy(() => import('./pages/Complaints'))
+const AdminComplaints = lazy(() => import('./pages/AdminComplaints'))
 
 class AppErrorBoundary extends Component {
   constructor(props) {
@@ -59,31 +60,43 @@ function ComingSoon({ page }) {
   )
 }
 
+function PageLoading() {
+  return (
+    <main style={{ minHeight: '100vh', display: 'grid', placeItems: 'center', padding: 24 }}>
+      <div className="panel" role="status" style={{ padding: 24, textAlign: 'center' }}>
+        Loading page...
+      </div>
+    </main>
+  )
+}
+
 export default function App() {
   const role = getSession()?.user.role
   return (
     <AppErrorBoundary>
       <BrowserRouter>
-        <Routes>
-          <Route path="/register" element={<PublicOnlyRoute><Register /></PublicOnlyRoute>} />
-          <Route path="/login" element={<PublicOnlyRoute><Login /></PublicOnlyRoute>} />
-          <Route path="/" element={<ProtectedRoute><Shell /></ProtectedRoute>}>
-            <Route path="add-staff" element={<ProtectedRoute roles={['MUNICIPAL_ADMIN', 'WARD_OFFICER']}><AddStaff /></ProtectedRoute>} />
-            <Route index element={<Navigate to={role ? landingPath(role) : '/login'} replace />} />
-            <Route path="dashboard" element={<ProtectedRoute roles={['MUNICIPAL_ADMIN', 'WARD_OFFICER']}><Dashboard /></ProtectedRoute>} />
-            <Route path="work-orders" element={<ProtectedRoute roles={['MUNICIPAL_ADMIN', 'WARD_OFFICER']}><WorkOrders /></ProtectedRoute>} />
-            <Route path="map" element={<ProtectedRoute roles={['CITIZEN', 'FIELD_WORKER', 'WARD_OFFICER', 'MUNICIPAL_ADMIN', 'AUDITOR']}><MapView /></ProtectedRoute>} />
-            <Route path="field-teams" element={<ProtectedRoute roles={['MUNICIPAL_ADMIN', 'WARD_OFFICER']}><FieldTeams /></ProtectedRoute>} />
-            <Route path="complaints" element={
-              <ProtectedRoute roles={['CITIZEN', 'MUNICIPAL_ADMIN', 'WARD_OFFICER']}>
-                {role === 'CITIZEN' ? <Complaints /> : <AdminComplaints />}
-              </ProtectedRoute>
-            } />
-            <Route path="reports" element={<ProtectedRoute roles={['MUNICIPAL_ADMIN', 'WARD_OFFICER']}><ComingSoon page="Reports" /></ProtectedRoute>} />
-            <Route path="settings" element={<ProtectedRoute roles={['CITIZEN', 'FIELD_WORKER', 'WARD_OFFICER', 'MUNICIPAL_ADMIN']}><ComingSoon page="Settings" /></ProtectedRoute>} />
-          </Route>
-          <Route path="*" element={<Navigate to={role ? landingPath(role) : '/login'} replace />} />
-        </Routes>
+        <Suspense fallback={<PageLoading />}>
+          <Routes>
+            <Route path="/register" element={<PublicOnlyRoute><Register /></PublicOnlyRoute>} />
+            <Route path="/login" element={<PublicOnlyRoute><Login /></PublicOnlyRoute>} />
+            <Route path="/" element={<ProtectedRoute><Shell /></ProtectedRoute>}>
+              <Route path="add-staff" element={<ProtectedRoute roles={['MUNICIPAL_ADMIN', 'WARD_OFFICER']}><AddStaff /></ProtectedRoute>} />
+              <Route index element={<Navigate to={role ? landingPath(role) : '/login'} replace />} />
+              <Route path="dashboard" element={<ProtectedRoute roles={['MUNICIPAL_ADMIN', 'WARD_OFFICER']}><Dashboard /></ProtectedRoute>} />
+              <Route path="work-orders" element={<ProtectedRoute roles={['MUNICIPAL_ADMIN', 'WARD_OFFICER']}><WorkOrders /></ProtectedRoute>} />
+              <Route path="map" element={<ProtectedRoute roles={['CITIZEN', 'FIELD_WORKER', 'WARD_OFFICER', 'MUNICIPAL_ADMIN', 'AUDITOR']}><MapView /></ProtectedRoute>} />
+              <Route path="field-teams" element={<ProtectedRoute roles={['MUNICIPAL_ADMIN', 'WARD_OFFICER']}><FieldTeams /></ProtectedRoute>} />
+              <Route path="complaints" element={
+                <ProtectedRoute roles={['CITIZEN', 'MUNICIPAL_ADMIN', 'WARD_OFFICER']}>
+                  {role === 'CITIZEN' ? <Complaints /> : <AdminComplaints />}
+                </ProtectedRoute>
+              } />
+              <Route path="reports" element={<ProtectedRoute roles={['MUNICIPAL_ADMIN', 'WARD_OFFICER']}><ComingSoon page="Reports" /></ProtectedRoute>} />
+              <Route path="settings" element={<ProtectedRoute roles={['CITIZEN', 'FIELD_WORKER', 'WARD_OFFICER', 'MUNICIPAL_ADMIN']}><ComingSoon page="Settings" /></ProtectedRoute>} />
+            </Route>
+            <Route path="*" element={<Navigate to={role ? landingPath(role) : '/login'} replace />} />
+          </Routes>
+        </Suspense>
       </BrowserRouter>
     </AppErrorBoundary>
   )

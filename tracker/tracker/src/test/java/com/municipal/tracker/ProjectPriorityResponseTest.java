@@ -30,8 +30,13 @@ class ProjectPriorityResponseTest {
 
         assertThat(response.projectId()).isEqualTo(3L);
         assertThat(response.projectName()).isEqualTo("Drain repair");
+        assertThat(response.totalScore()).isEqualTo(12.5);
+        assertThat(response.priorityLevel()).isEqualTo(ProjectPriorityLevel.LOW);
         assertThat(response.advisoryNotice()).contains("not an official government formula");
         assertThat(response.factors().get(0).available()).isFalse();
+        assertThat(response.factors().get(0).weight()).isEqualTo(0.20);
+        assertThat(response.reasons()).containsExactly(
+                "IMPACT: Project impact has not been classified");
         assertThat(ProjectPriorityResponse.class.getRecordComponents())
                 .noneMatch(component -> component.getType().equals(MunicipalProject.class));
     }

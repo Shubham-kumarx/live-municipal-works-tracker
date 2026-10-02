@@ -44,7 +44,12 @@ class ProjectDelayRiskControllerTest {
         verify(delayRisks).calculateForActor(9L, citizen);
         assertThat(response).isNotNull();
         assertThat(response.projectId()).isEqualTo(9L);
+        assertThat(response.available()).isTrue();
         assertThat(response.delayRisk()).isEqualTo(DelayRisk.AT_RISK);
+        assertThat(response.expectedProgress()).isEqualTo(60.0);
+        assertThat(response.actualProgress()).isEqualTo(40.0);
+        assertThat(response.progressGap()).isEqualTo(20.0);
+        assertThat(response.overdue()).isFalse();
     }
 
     @Test

@@ -1,5 +1,6 @@
 package com.municipal.tracker.service;
 
+import com.municipal.tracker.dto.WardProjectStatsResponse;
 import com.municipal.tracker.model.*;
 import com.municipal.tracker.repository.ProjectRepository;
 import com.municipal.tracker.repository.UserRepository;
@@ -250,29 +251,15 @@ public class ProjectService {
 
     // ── WARD DASHBOARD STATS ─────────────────────
     @Transactional(readOnly = true)
-    public Map<String, Object> getWardStats(Long wardId) {
-        Map<String, Object> stats = new HashMap<>();
-
-        stats.put("totalProjects",
-                projectRepository.countByWardId(wardId));
-        stats.put("sanctioned",
-                projectRepository.countByWardIdAndStatus(
-                        wardId, ProjectStatus.SANCTIONED));
-        stats.put("inProgress",
-                projectRepository.countByWardIdAndStatus(
-                        wardId, ProjectStatus.IN_PROGRESS));
-        stats.put("completed",
-                projectRepository.countByWardIdAndStatus(
-                        wardId, ProjectStatus.COMPLETED));
-        stats.put("delayed",
-                projectRepository.countByWardIdAndStatus(
-                        wardId, ProjectStatus.DELAYED));
-        stats.put("totalBudgetAllocated",
-                Optional.ofNullable(projectRepository.getTotalBudgetAllocatedByWard(wardId)).orElse(0.0));
-        stats.put("totalBudgetSpent",
+    public WardProjectStatsResponse getWardStats(Long wardId) {
+        return new WardProjectStatsResponse(
+                projectRepository.countByWardId(wardId),
+                projectRepository.countByWardIdAndStatus(wardId, ProjectStatus.SANCTIONED),
+                projectRepository.countByWardIdAndStatus(wardId, ProjectStatus.IN_PROGRESS),
+                projectRepository.countByWardIdAndStatus(wardId, ProjectStatus.COMPLETED),
+                projectRepository.countByWardIdAndStatus(wardId, ProjectStatus.DELAYED),
+                Optional.ofNullable(projectRepository.getTotalBudgetAllocatedByWard(wardId)).orElse(0.0),
                 Optional.ofNullable(projectRepository.getTotalBudgetSpentByWard(wardId)).orElse(0.0));
-
-        return stats;
     }
 
     // ── WEBSOCKET BROADCAST ──────────────────────

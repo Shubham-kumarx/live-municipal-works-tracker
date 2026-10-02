@@ -25,8 +25,27 @@ class ComplaintLinkingControllerTest {
         when(complaints.linkToProject(1L, 2L, admin)).thenReturn(linked);
         when(complaints.unlinkFromProject(1L, admin)).thenReturn(linked);
 
-        assertThat(complaintController.link(1L, 2L, admin).getBody()).isSameAs(linked);
-        assertThat(complaintController.unlink(1L, admin).getBody()).isSameAs(linked);
+        var linkResponse = complaintController.link(1L, 2L, admin);
+        var unlinkResponse = complaintController.unlink(1L, admin);
+
+        assertThat(linkResponse.getStatusCode().value()).isEqualTo(200);
+        assertThat(linkResponse.getBody()).isSameAs(linked);
+        assertThat(unlinkResponse.getStatusCode().value()).isEqualTo(200);
+        assertThat(unlinkResponse.getBody()).isSameAs(linked);
+    }
+
+    @Test
+    void returnsLinkableProjectOptionsAndLinkedProjectDto() {
+        User admin = new User(); admin.setRole(Role.MUNICIPAL_ADMIN);
+        ProjectLinkOptionResponse option = new ProjectLinkOptionResponse(
+                2L, "Road repair", ProjectStatus.IN_PROGRESS, 4L, "Test Road");
+        ComplaintLinkedProjectResponse linkedProject = new ComplaintLinkedProjectResponse(
+                2L, "Road repair", ProjectStatus.IN_PROGRESS, "Test Road", 50);
+        when(complaints.listLinkableProjects(admin)).thenReturn(List.of(option));
+        when(complaints.getLinkedProject(1L, admin)).thenReturn(Optional.of(linkedProject));
+
+        assertThat(complaintController.linkableProjects(admin).getBody()).containsExactly(option);
+        assertThat(complaintController.getLinkedProject(1L, admin).getBody()).isEqualTo(linkedProject);
     }
 
     @Test

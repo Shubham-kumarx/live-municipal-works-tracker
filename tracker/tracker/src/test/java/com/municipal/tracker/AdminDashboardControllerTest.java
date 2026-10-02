@@ -35,7 +35,15 @@ class AdminDashboardControllerTest {
 
         mockMvc.perform(get("/api/dashboard"))
                 .andExpect(status().isOk())
-                .andExpect(jsonPath("$.workMetrics.total").value(4));
+                .andExpect(jsonPath("$.workMetrics.total").value(4))
+                .andExpect(jsonPath("$.workMetrics.highPriority").value(1))
+                .andExpect(jsonPath("$.workMetrics.highDelayRisk").value(1))
+                .andExpect(jsonPath("$.complaintMetrics.total").value(2))
+                .andExpect(jsonPath("$.complaintMetrics.unresolved").value(2))
+                .andExpect(jsonPath("$.complaintMetrics.aiAssisted").value(1))
+                .andExpect(jsonPath("$.works").isArray())
+                .andExpect(jsonPath("$.recentComplaints").isArray())
+                .andExpect(jsonPath("$.generatedAt").exists());
     }
 
     @Test
@@ -44,7 +52,9 @@ class AdminDashboardControllerTest {
         stubResponse();
 
         mockMvc.perform(get("/api/dashboard"))
-                .andExpect(status().isOk());
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.workStatusDistribution").isArray())
+                .andExpect(jsonPath("$.complaintSeverityDistribution").isArray());
     }
 
     @Test

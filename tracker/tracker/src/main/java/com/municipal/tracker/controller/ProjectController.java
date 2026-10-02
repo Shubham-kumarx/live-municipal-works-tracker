@@ -8,6 +8,7 @@ import com.municipal.tracker.dto.ProjectCreateRequest;
 import com.municipal.tracker.dto.ProjectImpactUpdateRequest;
 import com.municipal.tracker.dto.ProjectPriorityResponse;
 import com.municipal.tracker.dto.ProjectDelayRiskResponse;
+import com.municipal.tracker.dto.WardProjectStatsResponse;
 import jakarta.validation.Valid;
 import com.municipal.tracker.model.ProjectStatus;
 import com.municipal.tracker.model.User;
@@ -21,7 +22,6 @@ import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.security.core.annotation.AuthenticationPrincipal;
 import org.springframework.web.bind.annotation.*;
 import java.util.List;
-import java.util.Map;
 
 @RestController
 @RequestMapping("/api/projects")
@@ -63,7 +63,7 @@ public class ProjectController {
     // ── GET ward dashboard stats
     // GET http://localhost:8080/api/projects/ward/2/stats
     @GetMapping("/ward/{wardId}/stats")
-    public ResponseEntity<Map<String, Object>> getWardStats(
+    public ResponseEntity<WardProjectStatsResponse> getWardStats(
             @PathVariable Long wardId) {
         return ResponseEntity.ok(
                 projectService.getWardStats(wardId)
