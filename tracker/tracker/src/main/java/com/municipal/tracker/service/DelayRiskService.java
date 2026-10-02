@@ -4,10 +4,12 @@ import com.municipal.tracker.config.DelayRiskProperties;
 import com.municipal.tracker.model.DelayRisk;
 import com.municipal.tracker.model.MunicipalProject;
 import com.municipal.tracker.model.ProjectStatus;
+import com.municipal.tracker.model.User;
 import com.municipal.tracker.repository.ProjectRepository;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.HttpStatus;
 import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Transactional;
 import org.springframework.web.server.ResponseStatusException;
 
 import java.time.LocalDate;
@@ -19,11 +21,21 @@ public class DelayRiskService {
     private final ProjectRepository projectRepository;
     private final PriorityFactorCalculator factorCalculator;
     private final DelayRiskProperties properties;
+    private final ProjectAccessService projectAccessService;
 
+    @Transactional(readOnly = true)
+    public Calculation calculateForActor(Long projectId, User actor) {
+        Calculation calculation = calculate(projectId);
+        projectAccessService.requireProjectWardAccess(actor, calculation.project());
+        return calculation;
+    }
+
+    @Transactional(readOnly = true)
     public Calculation calculate(Long projectId) {
         return calculate(projectId, LocalDate.now(), LocalDateTime.now());
     }
 
+    @Transactional(readOnly = true)
     public Calculation calculate(Long projectId, LocalDate calculationDate, LocalDateTime calculatedAt) {
         MunicipalProject project = projectRepository.findById(projectId)
                 .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND,

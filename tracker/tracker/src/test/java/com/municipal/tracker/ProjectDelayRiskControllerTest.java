@@ -20,10 +20,9 @@ import static org.mockito.Mockito.*;
 class ProjectDelayRiskControllerTest {
     private final ProjectService projects = mock(ProjectService.class);
     private final PriorityCalculationService priorities = mock(PriorityCalculationService.class);
-    private final ProjectAccessService access = mock(ProjectAccessService.class);
     private final DelayRiskService delayRisks = mock(DelayRiskService.class);
     private final ProjectController controller = new ProjectController(
-            projects, priorities, access, delayRisks);
+            projects, priorities, delayRisks);
 
     @Test
     void returnsSafeDelayRiskResponseAfterWardAccessCheck() {
@@ -38,11 +37,11 @@ class ProjectDelayRiskControllerTest {
         DelayRiskService.Calculation calculation = new DelayRiskService.Calculation(
                 project, true, DelayRisk.AT_RISK, 60.0, 40.0, 20.0,
                 false, "Project is behind expected progress", LocalDateTime.of(2026, 9, 28, 6, 0));
-        when(delayRisks.calculate(9L)).thenReturn(calculation);
+        when(delayRisks.calculateForActor(9L, citizen)).thenReturn(calculation);
 
         ProjectDelayRiskResponse response = controller.getDelayRisk(9L, citizen).getBody();
 
-        verify(access).requireProjectWardAccess(citizen, project);
+        verify(delayRisks).calculateForActor(9L, citizen);
         assertThat(response).isNotNull();
         assertThat(response.projectId()).isEqualTo(9L);
         assertThat(response.delayRisk()).isEqualTo(DelayRisk.AT_RISK);

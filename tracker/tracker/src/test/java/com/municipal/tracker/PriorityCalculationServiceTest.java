@@ -6,6 +6,7 @@ import com.municipal.tracker.repository.ComplaintRepository;
 import com.municipal.tracker.repository.ProjectRepository;
 import com.municipal.tracker.service.PriorityCalculationService;
 import com.municipal.tracker.service.PriorityFactorCalculator;
+import com.municipal.tracker.service.ProjectAccessService;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.springframework.web.server.ResponseStatusException;
@@ -17,19 +18,19 @@ import java.util.Optional;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
-import static org.mockito.Mockito.mock;
-import static org.mockito.Mockito.when;
+import static org.mockito.Mockito.*;
 
 class PriorityCalculationServiceTest {
     private final ProjectRepository projects = mock(ProjectRepository.class);
     private final ComplaintRepository complaints = mock(ComplaintRepository.class);
+    private final ProjectAccessService access = mock(ProjectAccessService.class);
     private PriorityCalculationService service;
 
     @BeforeEach
     void setUp() {
         PriorityProperties properties = new PriorityProperties();
         service = new PriorityCalculationService(projects, complaints,
-                new PriorityFactorCalculator(properties), properties);
+                new PriorityFactorCalculator(properties), properties, access);
     }
 
     @Test
@@ -92,6 +93,18 @@ class PriorityCalculationServiceTest {
         assertThatThrownBy(() -> service.calculate(99L))
                 .isInstanceOf(ResponseStatusException.class)
                 .hasMessageContaining("404 NOT_FOUND");
+    }
+
+    @Test
+    void actorCalculationChecksProjectAccess() {
+        MunicipalProject project = project(12L);
+        User actor = new User();
+        when(projects.findById(12L)).thenReturn(Optional.of(project));
+        when(complaints.findByMunicipalProjectId(12L)).thenReturn(List.of());
+
+        service.calculateForActor(12L, actor);
+
+        verify(access).requireProjectWardAccess(actor, project);
     }
 
     @Test

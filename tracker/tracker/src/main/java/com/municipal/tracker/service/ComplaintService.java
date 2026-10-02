@@ -28,6 +28,7 @@ public class ComplaintService {
     private final ProjectRepository projectRepository;
     private final ProjectAccessService projectAccessService;
 
+    @Transactional
     public ComplaintResponse create(ComplaintCreateRequest request, MultipartFile image, User actor) {
         if (actor == null || actor.getRole() != Role.CITIZEN) {
             throw new AccessDeniedException("Only citizens can submit complaints");
@@ -92,7 +93,11 @@ public class ComplaintService {
     }
 
     @Transactional(readOnly = true)
-    public List<LinkedComplaintResponse> getLinkedComplaints(Long projectId) {
+    public List<LinkedComplaintResponse> getLinkedComplaints(Long projectId, User actor) {
+        MunicipalProject project = projectRepository.findById(projectId)
+                .orElseThrow(() -> new ResponseStatusException(NOT_FOUND,
+                        "Project not found: " + projectId));
+        projectAccessService.requireProjectWardAccess(actor, project);
         return complaintRepository.findByMunicipalProjectIdOrderByCreatedAtDesc(projectId).stream()
                 .map(LinkedComplaintResponse::from)
                 .toList();

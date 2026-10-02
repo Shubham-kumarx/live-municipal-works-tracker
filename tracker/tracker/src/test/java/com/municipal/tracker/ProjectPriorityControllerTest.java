@@ -19,8 +19,8 @@ import static org.mockito.Mockito.*;
 class ProjectPriorityControllerTest {
     private final ProjectService projects = mock(ProjectService.class);
     private final PriorityCalculationService priorities = mock(PriorityCalculationService.class);
-    private final ProjectAccessService access = mock(ProjectAccessService.class);
-    private final ProjectController controller = new ProjectController(projects, priorities, access);
+    private final ProjectController controller = new ProjectController(
+            projects, priorities, mock(com.municipal.tracker.service.DelayRiskService.class));
 
     @Test
     void returnsSafePriorityResponseAfterWardAccessCheck() {
@@ -37,11 +37,11 @@ class ProjectPriorityControllerTest {
         PriorityCalculationService.Calculation calculation = new PriorityCalculationService.Calculation(
                 project, 40.0, ProjectPriorityLevel.MEDIUM, List.of(), List.of(),
                 LocalDateTime.of(2026, 9, 27, 12, 0));
-        when(priorities.calculate(9L)).thenReturn(calculation);
+        when(priorities.calculateForActor(9L, citizen)).thenReturn(calculation);
 
         ProjectPriorityResponse response = controller.getPriority(9L, citizen).getBody();
 
-        verify(access).requireProjectWardAccess(citizen, project);
+        verify(priorities).calculateForActor(9L, citizen);
         assertThat(response).isNotNull();
         assertThat(response.projectId()).isEqualTo(9L);
         assertThat(response.priorityLevel()).isEqualTo(ProjectPriorityLevel.MEDIUM);

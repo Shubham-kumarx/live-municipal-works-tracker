@@ -4,11 +4,13 @@ import com.municipal.tracker.config.PriorityProperties;
 import com.municipal.tracker.model.Complaint;
 import com.municipal.tracker.model.MunicipalProject;
 import com.municipal.tracker.model.ProjectPriorityLevel;
+import com.municipal.tracker.model.User;
 import com.municipal.tracker.repository.ComplaintRepository;
 import com.municipal.tracker.repository.ProjectRepository;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.HttpStatus;
 import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Transactional;
 import org.springframework.web.server.ResponseStatusException;
 
 import java.time.LocalDate;
@@ -22,11 +24,21 @@ public class PriorityCalculationService {
     private final ComplaintRepository complaintRepository;
     private final PriorityFactorCalculator factorCalculator;
     private final PriorityProperties properties;
+    private final ProjectAccessService projectAccessService;
 
+    @Transactional(readOnly = true)
+    public Calculation calculateForActor(Long projectId, User actor) {
+        Calculation calculation = calculate(projectId);
+        projectAccessService.requireProjectWardAccess(actor, calculation.project());
+        return calculation;
+    }
+
+    @Transactional(readOnly = true)
     public Calculation calculate(Long projectId) {
         return calculate(projectId, LocalDate.now(), LocalDateTime.now());
     }
 
+    @Transactional(readOnly = true)
     public Calculation calculate(Long projectId, LocalDate calculationDate, LocalDateTime calculatedAt) {
         MunicipalProject project = projectRepository.findById(projectId)
                 .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND,

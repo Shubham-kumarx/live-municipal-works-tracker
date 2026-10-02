@@ -5,11 +5,20 @@ import com.municipal.tracker.model.Role;
 import com.municipal.tracker.model.User;
 import com.municipal.tracker.model.Ward;
 import com.municipal.tracker.service.ProjectAccessService;
+import com.municipal.tracker.service.WardService;
+import com.municipal.tracker.service.AuthService;
+import com.municipal.tracker.config.JwtUtil;
+import com.municipal.tracker.dto.RegisterRequest;
+import com.municipal.tracker.repository.UserRepository;
+import com.municipal.tracker.repository.WardRepository;
+import org.springframework.security.authentication.AuthenticationManager;
+import org.springframework.security.crypto.password.PasswordEncoder;
 import org.junit.jupiter.api.Test;
 import org.springframework.security.access.AccessDeniedException;
 
 import static org.assertj.core.api.Assertions.assertThatCode;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
+import static org.mockito.Mockito.*;
 
 class AuthorizationTest {
     private final ProjectAccessService access = new ProjectAccessService();
@@ -39,6 +48,32 @@ class AuthorizationTest {
     void nullActorCannotAccessWard() {
         assertThatThrownBy(() -> access.requireWardAccess(null, 1L))
                 .isInstanceOf(AccessDeniedException.class);
+    }
+
+    @Test
+    void wardServiceChecksAccessBeforeLoadingWardForUpdate() {
+        WardRepository wards = mock(WardRepository.class);
+        WardService service = new WardService(wards, access);
+        User officer = user(10L, Role.WARD_OFFICER, ward(1L));
+
+        assertThatThrownBy(() -> service.updateWard(2L, new Ward(), officer))
+                .isInstanceOf(AccessDeniedException.class);
+        verify(wards, never()).findById(anyLong());
+    }
+
+    @Test
+    void authServiceRejectsUnsupportedStaffRoleBeforePersistence() {
+        UserRepository users = mock(UserRepository.class);
+        AuthService service = new AuthService(users, mock(WardRepository.class),
+                mock(PasswordEncoder.class), mock(JwtUtil.class), mock(AuthenticationManager.class));
+        RegisterRequest request = new RegisterRequest();
+        request.setRole(Role.MUNICIPAL_ADMIN);
+
+        assertThatThrownBy(() -> service.registerStaff(
+                request, user(1L, Role.MUNICIPAL_ADMIN, ward(1L))))
+                .isInstanceOf(IllegalArgumentException.class)
+                .hasMessageContaining("FIELD_WORKER or WARD_OFFICER");
+        verifyNoInteractions(users);
     }
 
     private Ward ward(Long id) {

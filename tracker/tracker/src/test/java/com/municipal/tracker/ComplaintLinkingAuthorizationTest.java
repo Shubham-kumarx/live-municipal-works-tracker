@@ -41,6 +41,18 @@ class ComplaintLinkingAuthorizationTest {
                 .isInstanceOf(AccessDeniedException.class);
     }
 
+    @Test
+    void linkedComplaintQueryChecksProjectWardAccess() {
+        MunicipalProject project = project(2L, ward(2L));
+        when(projects.findById(2L)).thenReturn(Optional.of(project));
+
+        assertThatThrownBy(() -> service.getLinkedComplaints(
+                2L, user(Role.WARD_OFFICER, ward(1L))))
+                .isInstanceOf(AccessDeniedException.class);
+
+        verify(complaints, never()).findByMunicipalProjectIdOrderByCreatedAtDesc(anyLong());
+    }
+
     private Ward ward(Long id) { Ward ward = new Ward(); ward.setId(id); return ward; }
     private User user(Role role, Ward ward) { User user = new User(); user.setRole(role); user.setWard(ward); return user; }
     private Complaint complaint(Long id, User reporter) { Complaint c = new Complaint(); c.setId(id); c.setReportingUser(reporter); return c; }

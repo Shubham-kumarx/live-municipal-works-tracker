@@ -12,7 +12,6 @@ import jakarta.validation.Valid;
 import com.municipal.tracker.model.ProjectStatus;
 import com.municipal.tracker.model.User;
 import com.municipal.tracker.service.ProjectService;
-import com.municipal.tracker.service.ProjectAccessService;
 import com.municipal.tracker.service.PriorityCalculationService;
 import com.municipal.tracker.service.DelayRiskService;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -30,24 +29,15 @@ public class ProjectController {
 
     private final ProjectService projectService;
     private final PriorityCalculationService priorityCalculationService;
-    private final ProjectAccessService projectAccessService;
     private final DelayRiskService delayRiskService;
 
     @Autowired
     public ProjectController(ProjectService projectService,
                              PriorityCalculationService priorityCalculationService,
-                             ProjectAccessService projectAccessService,
                              DelayRiskService delayRiskService) {
         this.projectService = projectService;
         this.priorityCalculationService = priorityCalculationService;
-        this.projectAccessService = projectAccessService;
         this.delayRiskService = delayRiskService;
-    }
-
-    public ProjectController(ProjectService projectService,
-                             PriorityCalculationService priorityCalculationService,
-                             ProjectAccessService projectAccessService) {
-        this(projectService, priorityCalculationService, projectAccessService, null);
     }
 
     // ── GET all projects in a ward (public - for map)
@@ -178,8 +168,8 @@ public class ProjectController {
     public ResponseEntity<ProjectPriorityResponse> getPriority(
             @PathVariable Long id,
             @AuthenticationPrincipal User currentUser) {
-        PriorityCalculationService.Calculation calculation = priorityCalculationService.calculate(id);
-        projectAccessService.requireProjectWardAccess(currentUser, calculation.project());
+        PriorityCalculationService.Calculation calculation =
+                priorityCalculationService.calculateForActor(id, currentUser);
         return ResponseEntity.ok(ProjectPriorityResponse.from(calculation));
     }
 
@@ -188,8 +178,7 @@ public class ProjectController {
     public ResponseEntity<ProjectDelayRiskResponse> getDelayRisk(
             @PathVariable Long id,
             @AuthenticationPrincipal User currentUser) {
-        DelayRiskService.Calculation calculation = delayRiskService.calculate(id);
-        projectAccessService.requireProjectWardAccess(currentUser, calculation.project());
+        DelayRiskService.Calculation calculation = delayRiskService.calculateForActor(id, currentUser);
         return ResponseEntity.ok(ProjectDelayRiskResponse.from(calculation));
     }
 }

@@ -7,11 +7,13 @@ import com.municipal.tracker.service.ProjectAccessService;
 import com.municipal.tracker.service.ProjectPhotoService;
 import com.municipal.tracker.service.ProjectService;
 import com.municipal.tracker.service.MunicipalImageValidator;
+import com.municipal.tracker.service.LocalImageStorageService;
 import org.junit.jupiter.api.Test;
 import org.springframework.mock.web.MockMultipartFile;
 import org.springframework.web.server.ResponseStatusException;
 
 import java.util.Optional;
+import java.nio.file.Path;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
@@ -34,7 +36,8 @@ class UploadSafetyTest {
         User actor = new User();
         when(repository.findById(1L)).thenReturn(Optional.of(new MunicipalProject()));
         ProjectPhotoService service = new ProjectPhotoService(
-                repository, access, mock(ProjectService.class), new MunicipalImageValidator());
+                repository, access, mock(ProjectService.class), new MunicipalImageValidator(),
+                mock(LocalImageStorageService.class));
 
         MockMultipartFile empty = new MockMultipartFile("photos", "photo.png", "image/png", new byte[0]);
         MockMultipartFile oversized = new MockMultipartFile(
@@ -53,7 +56,8 @@ class UploadSafetyTest {
         ProjectAccessService access = mock(ProjectAccessService.class);
         when(repository.findById(1L)).thenReturn(Optional.of(new MunicipalProject()));
         ProjectPhotoService service = new ProjectPhotoService(
-                repository, access, mock(ProjectService.class), new MunicipalImageValidator());
+                repository, access, mock(ProjectService.class), new MunicipalImageValidator(),
+                mock(LocalImageStorageService.class));
 
         MockMultipartFile mismatch = new MockMultipartFile(
                 "photos", "photo.jpg", "image/png", new byte[]{1, 2, 3});
@@ -64,5 +68,30 @@ class UploadSafetyTest {
                 .isInstanceOf(IllegalArgumentException.class).hasMessageContaining("extension");
         assertThatThrownBy(() -> service.upload(1L, new MockMultipartFile[]{corrupt}, new User()))
                 .isInstanceOf(IllegalArgumentException.class).hasMessageContaining("corrupt");
+    }
+
+    @Test
+    void storedProjectPhotosAreDeletedWhenPersistenceFails() {
+        ProjectRepository repository = mock(ProjectRepository.class);
+        ProjectAccessService access = mock(ProjectAccessService.class);
+        MunicipalImageValidator validator = mock(MunicipalImageValidator.class);
+        LocalImageStorageService storage = mock(LocalImageStorageService.class);
+        MunicipalProject project = new MunicipalProject();
+        User actor = new User();
+        MockMultipartFile file = new MockMultipartFile("files", "photo.png", "image/png", new byte[]{1});
+        MunicipalImageValidator.ValidatedImage validated =
+                new MunicipalImageValidator.ValidatedImage("png", "image/png", new byte[]{1});
+        LocalImageStorageService.StoredImage stored =
+                new LocalImageStorageService.StoredImage(Path.of("uploads", "photo.png"), "/uploads/photo.png");
+        when(repository.findById(1L)).thenReturn(Optional.of(project));
+        when(validator.validate(file)).thenReturn(validated);
+        when(storage.store(validated, null)).thenReturn(stored);
+        when(repository.save(project)).thenThrow(new IllegalStateException("database unavailable"));
+        ProjectPhotoService service = new ProjectPhotoService(
+                repository, access, mock(ProjectService.class), validator, storage);
+
+        assertThatThrownBy(() -> service.upload(1L, new MockMultipartFile[]{file}, actor))
+                .isInstanceOf(IllegalStateException.class);
+        verify(storage).delete(stored);
     }
 }

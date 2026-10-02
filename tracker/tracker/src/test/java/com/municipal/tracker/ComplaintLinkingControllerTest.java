@@ -4,7 +4,6 @@ import com.municipal.tracker.controller.ComplaintController;
 import com.municipal.tracker.controller.ProjectComplaintController;
 import com.municipal.tracker.dto.*;
 import com.municipal.tracker.model.*;
-import com.municipal.tracker.repository.ProjectRepository;
 import com.municipal.tracker.service.*;
 import org.junit.jupiter.api.Test;
 
@@ -40,20 +39,16 @@ class ComplaintLinkingControllerTest {
 
     @Test
     void projectQueryChecksWardAndReturnsReporterFreeSummaries() {
-        ProjectRepository projects = mock(ProjectRepository.class);
-        ProjectAccessService access = mock(ProjectAccessService.class);
-        ProjectComplaintController controller = new ProjectComplaintController(complaints, projects, access);
-        MunicipalProject project = new MunicipalProject(); project.setId(2L);
+        ProjectComplaintController controller = new ProjectComplaintController(complaints);
         User user = new User(); user.setRole(Role.CITIZEN);
         LinkedComplaintResponse summary = new LinkedComplaintResponse(
                 3L, "/image.png", "Issue", "Road", ComplaintIssueType.POTHOLE,
                 ComplaintSeverity.HIGH, ComplaintStatus.SUBMITTED, null);
-        when(projects.findById(2L)).thenReturn(Optional.of(project));
-        when(complaints.getLinkedComplaints(2L)).thenReturn(List.of(summary));
+        when(complaints.getLinkedComplaints(2L, user)).thenReturn(List.of(summary));
 
         List<LinkedComplaintResponse> response = controller.getLinkedComplaints(2L, user).getBody();
 
-        verify(access).requireProjectWardAccess(user, project);
+        verify(complaints).getLinkedComplaints(2L, user);
         assertThat(response).containsExactly(summary);
         assertThat(LinkedComplaintResponse.class.getRecordComponents())
                 .noneMatch(component -> component.getName().toLowerCase().contains("reporter"));
