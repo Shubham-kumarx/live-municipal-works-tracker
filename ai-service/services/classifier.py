@@ -10,7 +10,7 @@ os.environ.setdefault("HF_HUB_CACHE", str(MODEL_CACHE / "hub"))
 
 from PIL import Image
 import torch
-from transformers import AutoModelForZeroShotImageClassification, AutoProcessor
+from transformers import CLIPModel, CLIPProcessor
 
 ISSUE_PROMPTS = {
     "POTHOLE": "a photo of a pothole in a road",
@@ -69,11 +69,20 @@ class MunicipalIssueClassifier:
         if self._model is not None:
             return
         MODEL_CACHE.mkdir(parents=True, exist_ok=True)
-        self._processor = AutoProcessor.from_pretrained(MODEL_ID, cache_dir=MODEL_CACHE)
-        self._model = AutoModelForZeroShotImageClassification.from_pretrained(
-            MODEL_ID, cache_dir=MODEL_CACHE
-        ).to(self._device)
+        try:
+            processor, model = self._load_components(local_files_only=True)
+        except OSError:
+            processor, model = self._load_components(local_files_only=False)
+        self._processor = processor
+        self._model = model.to(self._device)
         self._model.eval()
+
+    @staticmethod
+    def _load_components(local_files_only: bool):
+        options = {"cache_dir": MODEL_CACHE, "local_files_only": local_files_only}
+        processor = CLIPProcessor.from_pretrained(MODEL_ID, **options)
+        model = CLIPModel.from_pretrained(MODEL_ID, **options)
+        return processor, model
 
     def classify(self, image: Image.Image) -> RawPrediction:
         self._load()

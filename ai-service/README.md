@@ -17,6 +17,11 @@ python -m venv .venv
 The service health endpoint is `GET /health`. Model files are stored in
 `ai-service/.model-cache/` and are excluded from Git.
 
+At first inference, the service checks the local cache without contacting the model
+registry. If the cache is incomplete, it falls back to the standard model download.
+After one successful download, later starts can load entirely from the local cache.
+`AI_MODEL_ID`, when overridden, must identify a CLIP-compatible Transformers model.
+
 Optional confidence settings:
 
 ```text

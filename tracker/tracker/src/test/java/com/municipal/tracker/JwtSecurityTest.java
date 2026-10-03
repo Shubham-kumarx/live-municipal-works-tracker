@@ -27,8 +27,13 @@ class JwtSecurityTest {
     void tamperedTokenIsRejected() {
         JwtUtil jwt = jwt(60_000L);
         String token = jwt.generateToken(user("citizen@example.test"));
-        String tampered = token.substring(0, token.length() - 1)
-                + (token.endsWith("a") ? "b" : "a");
+        String[] sections = token.split("\\.");
+        String changedPayload = decodedPayload(token)
+                .replace("citizen@example.test", "attacker@example.test");
+        String tampered = sections[0] + "."
+                + java.util.Base64.getUrlEncoder().withoutPadding().encodeToString(
+                        changedPayload.getBytes(java.nio.charset.StandardCharsets.UTF_8))
+                + "." + sections[2];
 
         assertThatThrownBy(() -> jwt.extractEmail(tampered)).isInstanceOf(JwtException.class);
     }

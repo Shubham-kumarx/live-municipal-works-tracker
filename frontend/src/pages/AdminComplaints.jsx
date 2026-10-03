@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useState } from 'react'
+import { Link } from 'react-router-dom'
 import api from '../api/axios'
 import { apiErrorMessage } from '../api/errors'
 
@@ -99,8 +100,15 @@ export default function AdminComplaints() {
                     <td>{label(complaint.finalSeverity)}</td>
                     <td>{complaint.locationAddress}</td>
                     <td>{complaint.createdAt ? new Date(complaint.createdAt).toLocaleString('en-IN') : '—'}</td>
-                    <td>{linked ? `${linked.projectName} (#${linked.id})`
-                      : complaint.municipalProjectId ? `Project #${complaint.municipalProjectId}` : 'Unlinked'}</td>
+                    <td>{linked ? (
+                      <Link to={`/map?projectId=${linked.id}&wardId=${linked.wardId}`} className="linked-work-link">
+                        {linked.projectName} (#{linked.id})
+                      </Link>
+                    ) : complaint.municipalProjectId ? (
+                      <Link to={`/map?projectId=${complaint.municipalProjectId}`} className="linked-work-link">
+                        Project #{complaint.municipalProjectId}
+                      </Link>
+                    ) : 'Unlinked'}</td>
                     <td style={{ minWidth: 230 }}>
                       {!complaint.municipalProjectId && (
                         <div style={{ display: 'flex', gap: 6 }}>

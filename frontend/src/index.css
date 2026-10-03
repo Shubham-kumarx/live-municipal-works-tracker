@@ -323,6 +323,18 @@ a { text-decoration: none; color: inherit; }
 }
 .operational-table { overflow-x: auto; }
 .operational-table .data-table { min-width: 820px; }
+.linked-work-link { color: var(--accent); font-weight: 500; text-decoration: none; }
+.linked-work-link:hover { text-decoration: underline; }
+.priority-factor-list {
+  display: flex; flex-direction: column; gap: 7px; margin-top: 10px;
+  padding-top: 9px; border-top: 1px solid var(--border);
+}
+.priority-factor { display: flex; flex-direction: column; gap: 3px; }
+.priority-factor-heading {
+  display: flex; justify-content: space-between; gap: 10px;
+  color: var(--text-primary); font-size: 11.5px; font-weight: 500;
+}
+.priority-factor-values { display: flex; flex-wrap: wrap; gap: 4px 10px; color: var(--text-secondary); font-size: 10.5px; }
 
 @media (max-width: 800px) {
   .dashboard-kpis { grid-template-columns: repeat(2, minmax(0, 1fr)); }

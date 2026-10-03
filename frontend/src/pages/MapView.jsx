@@ -64,6 +64,10 @@ function hasScore(value) {
   return value !== null && value !== undefined && value !== '' && Number.isFinite(Number(value))
 }
 
+function factorLabel(value) {
+  return value?.replaceAll('_', ' ').toLowerCase().replace(/^./, character => character.toUpperCase())
+}
+
 function ProtectedComplaintImage({ url }) {
   const [src, setSrc] = useState(null)
   useEffect(() => {
@@ -97,6 +101,7 @@ export default function MapView() {
   const stompRef    = useRef(null)
   const fetchSequence = useRef(0)
   const centeredWardRef = useRef(null)
+  const routeProjectHandledRef = useRef(false)
 
   const [projects, setProjects]   = useState([])
   const [selectedId, setSelectedId] = useState(null)
@@ -125,11 +130,15 @@ export default function MapView() {
   // Get wardId from logged-in user
   const user   = getSession()?.user || {}
   const wardId = Number.isInteger(user.wardId) && user.wardId > 0 ? user.wardId : null
+  const routeProjectId = Number(new URLSearchParams(window.location.search).get('projectId'))
+  const routeWardId = Number(new URLSearchParams(window.location.search).get('wardId'))
+  const mapWardId = wardId || (user.role === 'MUNICIPAL_ADMIN' && Number.isInteger(routeWardId) && routeWardId > 0
+    ? routeWardId : null)
   const canUpdateStatus = ['FIELD_WORKER', 'WARD_OFFICER', 'MUNICIPAL_ADMIN'].includes(user.role)
   const selected = projects.find(project => project.id === selectedId) || null
 
   const loadProjects = useCallback(async (showLoading = false) => {
-    if (!wardId) {
+    if (!mapWardId) {
       setLoading(false)
       setProjects([])
       setLoadError('')
@@ -138,7 +147,7 @@ export default function MapView() {
     const sequence = ++fetchSequence.current
     if (showLoading) setLoading(true)
     try {
-      const res = await api.get(`/api/projects/ward/${wardId}`)
+      const res = await api.get(`/api/projects/ward/${mapWardId}`)
       if (sequence === fetchSequence.current) {
         setProjects(res.data)
         setLoadError('')
@@ -151,12 +160,20 @@ export default function MapView() {
       }
       throw err
     }
-  }, [wardId])
+  }, [mapWardId])
 
   // ── Fetch projects from backend ──────────
   useEffect(() => {
     loadProjects(true).catch(() => {})
   }, [loadProjects])
+
+  useEffect(() => {
+    if (loading || routeProjectHandledRef.current) return
+    routeProjectHandledRef.current = true
+    if (Number.isInteger(routeProjectId) && projects.some(project => project.id === routeProjectId)) {
+      setSelectedId(routeProjectId)
+    }
+  }, [loading, projects, routeProjectId])
 
   useEffect(() => {
     if (!selected) {
@@ -226,7 +243,7 @@ export default function MapView() {
 
   // ── WebSocket connection ─────────────────
   useEffect(() => {
-    if (!wardId) {
+    if (!mapWardId) {
       setWsStatus('disconnected')
       return
     }
@@ -239,7 +256,7 @@ export default function MapView() {
           loadProjects().catch(() => {})
           // Subscribe to ward's project updates
           client.subscribe(
-            `/topic/ward/${wardId}/projects`,
+            `/topic/ward/${mapWardId}/projects`,
             message => {
               JSON.parse(message.body)
               loadProjects().catch(() => {})
@@ -259,7 +276,7 @@ export default function MapView() {
       client.deactivate()
       if (stompRef.current === client) stompRef.current = null
     }
-  }, [wardId, loadProjects])
+  }, [mapWardId, loadProjects])
 
   // ── Init Leaflet map ─────────────────────
   useEffect(() => {
@@ -285,22 +302,22 @@ export default function MapView() {
   }, [])
 
   useEffect(() => {
-    if (!wardId || !mapInstance.current || centeredWardRef.current === wardId) return
+    if (!mapWardId || !mapInstance.current || centeredWardRef.current === mapWardId) return
     const project = projects.find(item => Number.isFinite(item.latitude) && Number.isFinite(item.longitude))
     if (project) {
       mapInstance.current.setView([project.latitude, project.longitude], 14)
-      centeredWardRef.current = wardId
+      centeredWardRef.current = mapWardId
       return
     }
     let cancelled = false
-    api.get(`/api/wards/${wardId}`).then(({ data }) => {
+    api.get(`/api/wards/${mapWardId}`).then(({ data }) => {
       if (!cancelled && Number.isFinite(data.centerLatitude) && Number.isFinite(data.centerLongitude)) {
         mapInstance.current?.setView([data.centerLatitude, data.centerLongitude], 14)
-        centeredWardRef.current = wardId
+        centeredWardRef.current = mapWardId
       }
     }).catch(() => {})
     return () => { cancelled = true }
-  }, [wardId, projects])
+  }, [mapWardId, projects])
 
   // ── Render markers when projects change ──
   useEffect(() => {
@@ -487,7 +504,7 @@ export default function MapView() {
         </div>
 
         {/* Empty state */}
-        {!loading && !wardId && (
+        {!loading && !mapWardId && projects.length === 0 && !loadError && (
           <div style={{
             position: 'absolute', top: '50%', left: '50%', transform: 'translate(-50%,-50%)',
             zIndex: 500, background: 'var(--bg-surface)', border: '1px solid var(--border)',
@@ -506,7 +523,7 @@ export default function MapView() {
               onClick={() => loadProjects(true).catch(() => {})}>Retry</button>
           </div>
         )}
-        {!loading && !loadError && wardId && projects.length === 0 && (
+        {!loading && !loadError && mapWardId && projects.length === 0 && (
           <div style={{
             position: 'absolute', top: '50%', left: '50%',
             transform: 'translate(-50%,-50%)', zIndex: 500,
@@ -516,7 +533,7 @@ export default function MapView() {
             padding: '24px 32px', textAlign: 'center'
           }}>
             <div style={{ fontSize: 13, fontWeight: 500, marginBottom: 4 }}>
-              No projects in Ward {wardId}
+              No projects in Ward {mapWardId}
             </div>
             <div style={{ fontSize: 12, color: 'var(--text-muted)' }}>
               Create a project from Postman or the admin panel
@@ -624,6 +641,26 @@ export default function MapView() {
                   <>
                     <div style={{ fontSize: 18, fontWeight: 500 }}>{formatScore(priority.totalScore)}{hasScore(priority.totalScore) ? ' / 100' : ''}</div>
                     <div className="t-caption">Decision-support score; not an official government formula.</div>
+                    {priority.factors?.length > 0 && (
+                      <div className="priority-factor-list" aria-label="Priority score factors">
+                        {priority.factors.map(factor => (
+                          <div className="priority-factor" key={factor.name}>
+                            <div className="priority-factor-heading">
+                              <span>{factorLabel(factor.name)}</span>
+                              <span>{factor.available
+                                ? `${formatScore(factor.weightedContribution)} points`
+                                : 'Unavailable'}</span>
+                            </div>
+                            <div className="priority-factor-values">
+                              <span>Raw: {factor.rawValue || 'Unavailable'}</span>
+                              <span>Score: {factor.available ? `${formatScore(factor.normalizedScore)} / 100` : 'Unavailable'}</span>
+                              <span>Weight: {Math.round(Number(factor.weight) * 100)}%</span>
+                            </div>
+                            <div className="t-caption">{factor.explanation}</div>
+                          </div>
+                        ))}
+                      </div>
+                    )}
                   </>
                 )}
               </div>

@@ -76,25 +76,35 @@ public class ProjectService {
     // ── GET ALL BY WARD ─────────────────────────
     @Transactional(readOnly = true)
     public List<MunicipalProject> getProjectsByWard(Long wardId) {
-        return projectRepository.findAllByWardForMap(wardId);
+        return initializeResponseCollections(projectRepository.findAllByWardForMap(wardId));
     }
 
     // ── GET BY ID ───────────────────────────────
     @Transactional(readOnly = true)
     public Optional<MunicipalProject> getProjectById(Long id) {
-        return projectRepository.findById(id);
+        return projectRepository.findById(id).map(this::initializeResponseCollections);
     }
 
     // ── GET BY WORKER ───────────────────────────
     @Transactional(readOnly = true)
     public List<MunicipalProject> getProjectsByWorker(Long workerId) {
-        return projectRepository.findByAssignedWorkerId(workerId);
+        return initializeResponseCollections(projectRepository.findByAssignedWorkerId(workerId));
     }
 
     // ── GET FLAGGED ─────────────────────────────
     @Transactional(readOnly = true)
     public List<MunicipalProject> getFlaggedProjects(Long wardId) {
-        return projectRepository.findByWardIdAndFlaggedTrue(wardId);
+        return initializeResponseCollections(projectRepository.findByWardIdAndFlaggedTrue(wardId));
+    }
+
+    private List<MunicipalProject> initializeResponseCollections(List<MunicipalProject> projects) {
+        projects.forEach(this::initializeResponseCollections);
+        return projects;
+    }
+
+    private MunicipalProject initializeResponseCollections(MunicipalProject project) {
+        project.getPhotoUrls().size();
+        return project;
     }
 
     // ── UPDATE STATUS ───────────────────────────
