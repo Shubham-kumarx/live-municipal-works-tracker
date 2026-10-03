@@ -137,9 +137,11 @@ public class ProjectController {
     // ── FLAG a project (any logged-in citizen)
     // PATCH http://localhost:8080/api/projects/1/flag
     @PatchMapping("/{id}/flag")
+    @PreAuthorize("hasRole('CITIZEN')")
     public ResponseEntity<ProjectResponse> flagProject(
-            @PathVariable Long id) {
-        return ResponseEntity.ok(ProjectResponse.from(projectService.flagProject(id)));
+            @PathVariable Long id,
+            @AuthenticationPrincipal User currentUser) {
+        return ResponseEntity.ok(ProjectResponse.from(projectService.flagProject(id, currentUser)));
     }
 
     // ── UPDATE budget spent (Officer/Admin only)

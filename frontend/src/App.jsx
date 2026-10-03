@@ -1,8 +1,9 @@
-import { Component, lazy, Suspense } from 'react'
+import { Component, lazy, Suspense, useEffect, useState } from 'react'
 import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom'
 import Shell from './components/Shell'
 import ProtectedRoute, { PublicOnlyRoute } from './components/ProtectedRoute'
-import { clearSession, getSession, landingPath } from './auth/session'
+import { clearSession, getSession, landingPath, setSessionUser } from './auth/session'
+import api from './api/axios'
 
 const Dashboard = lazy(() => import('./pages/Dashboard'))
 const WorkOrders = lazy(() => import('./pages/WorkOrders'))
@@ -24,9 +25,11 @@ class AppErrorBoundary extends Component {
     return { failed: true }
   }
 
-  handleSignOut = () => {
-    clearSession()
-    window.location.assign('/login')
+  handleSignOut = async () => {
+    try { await api.post('/api/auth/logout') } finally {
+      clearSession()
+      window.location.assign('/login')
+    }
   }
 
   render() {
@@ -71,6 +74,18 @@ function PageLoading() {
 }
 
 export default function App() {
+  const [sessionChecked, setSessionChecked] = useState(false)
+  const [, setSessionVersion] = useState(0)
+  useEffect(() => {
+    api.get('/api/auth/session', { skipAuthRedirect: true })
+      .then(({ data }) => setSessionUser(data))
+      .catch(() => clearSession())
+      .finally(() => {
+        setSessionVersion(value => value + 1)
+        setSessionChecked(true)
+      })
+  }, [])
+  if (!sessionChecked) return <PageLoading />
   const role = getSession()?.user.role
   return (
     <AppErrorBoundary>

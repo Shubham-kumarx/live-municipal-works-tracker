@@ -49,6 +49,8 @@ def predict(image: UploadFile = File(...)) -> PredictionResponse:
         raise HTTPException(status_code=400, detail="Image is corrupt or unsafe") from None
 
     prediction = classifier.classify(decoded)
+    if prediction.issue_type not in CATEGORIES:
+        raise HTTPException(status_code=502, detail="Model returned an unsupported issue type")
     confidence_level = confidence_policy.level(prediction.issue_score)
     return PredictionResponse(
         issueType=None if confidence_level == "LOW" else prediction.issue_type,

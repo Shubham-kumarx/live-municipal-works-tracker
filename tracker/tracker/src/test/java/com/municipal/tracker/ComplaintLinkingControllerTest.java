@@ -16,7 +16,7 @@ import static org.mockito.Mockito.*;
 class ComplaintLinkingControllerTest {
     private final ComplaintService complaints = mock(ComplaintService.class);
     private final ComplaintController complaintController = new ComplaintController(
-            mock(ImageAnalysisService.class), complaints);
+            mock(ImageAnalysisService.class), complaints, mock(ComplaintImageAccessService.class));
 
     @Test
     void delegatesLinkAndUnlinkToService() {

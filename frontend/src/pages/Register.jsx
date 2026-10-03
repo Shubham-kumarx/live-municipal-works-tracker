@@ -2,7 +2,7 @@ import { useCallback, useEffect, useState } from 'react'
 import { useNavigate, Link } from 'react-router-dom'
 import api from '../api/axios'
 import { apiErrorMessage } from '../api/errors'
-import { landingPath } from '../auth/session'
+import { landingPath, setSessionUser } from '../auth/session'
 function distanceKm(lat1, lng1, lat2, lng2) {
   const R = 6371
   const dLat = (lat2 - lat1) * Math.PI / 180
@@ -103,13 +103,7 @@ function detectNearestWard() {
         ...form, fullName, email, phone,
         wardId: Number(form.wardId),
       })
-      localStorage.setItem('token', res.data.token)
-      localStorage.setItem('user', JSON.stringify({
-        email: res.data.email,
-        fullName: res.data.fullName,
-        role: res.data.role,
-        wardId: res.data.wardId,
-      }))
+      setSessionUser(res.data)
       navigate(landingPath(res.data.role))
     } catch (err) {
       setError(apiErrorMessage(err, 'Registration failed. Try again.'))

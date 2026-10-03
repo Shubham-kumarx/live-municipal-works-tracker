@@ -3,7 +3,7 @@ import FieldUpdateForm from '../components/FieldUpdateForm'
 import api from '../api/axios'
 import { apiErrorMessage } from '../api/errors'
 import { getSession } from '../auth/session'
-import { API_BASE_URL, WS_URL } from '../config/backend'
+import { WS_URL } from '../config/backend'
 import L from 'leaflet'
 import 'leaflet/dist/leaflet.css'
 import SockJS from 'sockjs-client/dist/sockjs'
@@ -62,6 +62,27 @@ function formatScore(value) {
 
 function hasScore(value) {
   return value !== null && value !== undefined && value !== '' && Number.isFinite(Number(value))
+}
+
+function ProtectedComplaintImage({ url }) {
+  const [src, setSrc] = useState(null)
+  useEffect(() => {
+    if (!url) return undefined
+    let active = true
+    let objectUrl
+    api.get(url, { responseType: 'blob' }).then(({ data }) => {
+      if (!active) return
+      objectUrl = URL.createObjectURL(data)
+      setSrc(objectUrl)
+    }).catch(() => setSrc(null))
+    return () => {
+      active = false
+      if (objectUrl) URL.revokeObjectURL(objectUrl)
+    }
+  }, [url])
+  return src ? <img src={src} alt="Municipal complaint" style={{
+    width: 48, height: 48, objectFit: 'cover', borderRadius: 'var(--r-sm)'
+  }} /> : null
 }
 
 function formatProgress(value) {
@@ -205,15 +226,13 @@ export default function MapView() {
 
   // ── WebSocket connection ─────────────────
   useEffect(() => {
-    const token = localStorage.getItem('token')
-    if (!token || !wardId) {
+    if (!wardId) {
       setWsStatus('disconnected')
       return
     }
 
     const client = new Client({
         webSocketFactory: () => new SockJS(WS_URL),
-        connectHeaders: { Authorization: `Bearer ${token}` },
         beforeConnect: () => setWsStatus('connecting'),
         onConnect: () => {
           setWsStatus('connected')
@@ -687,13 +706,7 @@ export default function MapView() {
                         border: '1px solid var(--border)', borderRadius: 'var(--r-md)',
                         padding: 8, display: 'flex', gap: 8
                       }}>
-                        {complaint.imageUrl && (
-                          <img src={complaint.imageUrl.startsWith('http')
-                            ? complaint.imageUrl : `${API_BASE_URL}${complaint.imageUrl}`}
-                            alt="Municipal complaint" style={{
-                              width: 48, height: 48, objectFit: 'cover', borderRadius: 'var(--r-sm)'
-                            }} />
-                        )}
+                        {complaint.imageUrl && <ProtectedComplaintImage url={complaint.imageUrl} />}
                         <div style={{ minWidth: 0 }}>
                           <div style={{ fontSize: 11.5, fontWeight: 500 }}>
                             #{complaint.id} · {complaint.finalIssueType?.replaceAll('_', ' ')}

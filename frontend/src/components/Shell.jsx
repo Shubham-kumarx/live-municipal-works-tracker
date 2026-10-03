@@ -1,6 +1,7 @@
 import { useState } from 'react'
 import { Outlet, NavLink, useNavigate } from 'react-router-dom'
 import { clearSession, getSession } from '../auth/session'
+import api from '../api/axios'
 
 
 
@@ -29,9 +30,11 @@ export default function Shell() {
   const user = getSession()?.user || {}
   const [mobileNavOpen, setMobileNavOpen] = useState(false)
 
-  function handleLogout() {
-    clearSession()
-    navigate('/login')
+  async function handleLogout() {
+    try { await api.post('/api/auth/logout') } finally {
+      clearSession()
+      navigate('/login')
+    }
   }
 
   return (

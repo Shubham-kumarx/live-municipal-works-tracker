@@ -1,17 +1,21 @@
 export function getSession() {
-  const token = localStorage.getItem('token')
   try {
     const user = JSON.parse(localStorage.getItem('user') || 'null')
-    if (!token || !user || typeof user !== 'object' || typeof user.role !== 'string') return null
-    return { token, user }
+    if (!user || typeof user !== 'object' || typeof user.role !== 'string') return null
+    return { user }
   } catch {
     return null
   }
 }
 
 export function clearSession() {
-  localStorage.removeItem('token')
   localStorage.removeItem('user')
+}
+
+export function setSessionUser(user) {
+  localStorage.setItem('user', JSON.stringify({
+    email: user.email, fullName: user.fullName, role: user.role, wardId: user.wardId,
+  }))
 }
 
 export function landingPath(role) {

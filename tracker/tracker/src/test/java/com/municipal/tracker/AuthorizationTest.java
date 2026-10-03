@@ -5,12 +5,18 @@ import com.municipal.tracker.model.Role;
 import com.municipal.tracker.model.User;
 import com.municipal.tracker.model.Ward;
 import com.municipal.tracker.service.ProjectAccessService;
+import com.municipal.tracker.service.ProjectService;
 import com.municipal.tracker.service.WardService;
 import com.municipal.tracker.service.AuthService;
+import com.municipal.tracker.service.LoginAttemptService;
 import com.municipal.tracker.config.JwtUtil;
 import com.municipal.tracker.dto.RegisterRequest;
 import com.municipal.tracker.repository.UserRepository;
 import com.municipal.tracker.repository.WardRepository;
+import com.municipal.tracker.repository.ProjectRepository;
+import org.springframework.messaging.simp.SimpMessagingTemplate;
+import com.municipal.tracker.repository.ProjectFlagRepository;
+import jakarta.persistence.EntityManager;
 import org.springframework.security.authentication.AuthenticationManager;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.junit.jupiter.api.Test;
@@ -65,7 +71,8 @@ class AuthorizationTest {
     void authServiceRejectsUnsupportedStaffRoleBeforePersistence() {
         UserRepository users = mock(UserRepository.class);
         AuthService service = new AuthService(users, mock(WardRepository.class),
-                mock(PasswordEncoder.class), mock(JwtUtil.class), mock(AuthenticationManager.class));
+                mock(PasswordEncoder.class), mock(JwtUtil.class), mock(AuthenticationManager.class),
+                mock(LoginAttemptService.class));
         RegisterRequest request = new RegisterRequest();
         request.setRole(Role.MUNICIPAL_ADMIN);
 
@@ -74,6 +81,40 @@ class AuthorizationTest {
                 .isInstanceOf(IllegalArgumentException.class)
                 .hasMessageContaining("FIELD_WORKER or WARD_OFFICER");
         verifyNoInteractions(users);
+    }
+
+    @Test
+    void nonCitizenCannotFlagProject() {
+        ProjectRepository projects = mock(ProjectRepository.class);
+        ProjectService service = new ProjectService(projects, mock(WardRepository.class),
+                mock(UserRepository.class), mock(SimpMessagingTemplate.class), access,
+                mock(ProjectFlagRepository.class), mock(EntityManager.class));
+
+        assertThatThrownBy(() -> service.flagProject(1L,
+                user(1L, Role.MUNICIPAL_ADMIN, ward(1L))))
+                .isInstanceOf(AccessDeniedException.class);
+        verifyNoInteractions(projects);
+    }
+
+    @Test
+    void repeatedCitizenFlagDoesNotIncrementProjectAgain() {
+        ProjectRepository projects = mock(ProjectRepository.class);
+        ProjectFlagRepository flags = mock(ProjectFlagRepository.class);
+        EntityManager entityManager = mock(EntityManager.class);
+        MunicipalProject project = project(ward(1L), null);
+        project.setId(7L);
+        project.setFlagCount(3);
+        User citizen = user(11L, Role.CITIZEN, ward(1L));
+        when(projects.findById(7L)).thenReturn(java.util.Optional.of(project));
+        when(flags.existsByProjectIdAndCitizenId(7L, 11L)).thenReturn(true);
+        ProjectService service = new ProjectService(projects, mock(WardRepository.class),
+                mock(UserRepository.class), mock(SimpMessagingTemplate.class), access,
+                flags, entityManager);
+
+        assertThatCode(() -> service.flagProject(7L, citizen)).doesNotThrowAnyException();
+        org.assertj.core.api.Assertions.assertThat(project.getFlagCount()).isEqualTo(3);
+        verify(entityManager).lock(project, jakarta.persistence.LockModeType.PESSIMISTIC_WRITE);
+        verify(projects, never()).save(any());
     }
 
     private Ward ward(Long id) {

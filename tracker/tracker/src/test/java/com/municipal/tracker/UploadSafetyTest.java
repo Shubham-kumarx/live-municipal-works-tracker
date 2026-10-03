@@ -19,9 +19,29 @@ import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.verify;
+import static org.mockito.Mockito.verifyNoInteractions;
 import static org.mockito.Mockito.when;
 
 class UploadSafetyTest {
+
+    @Test
+    void photoBatchLimitIsEnforcedBeforeValidationOrStorage() {
+        ProjectRepository repository = mock(ProjectRepository.class);
+        ProjectAccessService access = mock(ProjectAccessService.class);
+        MunicipalImageValidator validator = mock(MunicipalImageValidator.class);
+        LocalImageStorageService storage = mock(LocalImageStorageService.class);
+        when(repository.findById(1L)).thenReturn(Optional.of(new MunicipalProject()));
+        ProjectPhotoService service = new ProjectPhotoService(repository, access,
+                mock(ProjectService.class), validator, storage, 2);
+        User actor = new User();
+        MockMultipartFile file = new MockMultipartFile("files", "photo.png", "image/png", new byte[]{1});
+
+        assertThatThrownBy(() -> service.upload(1L,
+                new MockMultipartFile[]{file, file, file}, actor))
+                .isInstanceOf(IllegalArgumentException.class)
+                .hasMessageContaining("maximum of 2");
+        verifyNoInteractions(validator, storage);
+    }
     @Test
     void t22ApprovedMimeTypesAreExplicitlyLimited() throws java.io.IOException {
         assertThat(java.nio.file.Files.readString(java.nio.file.Path.of(
@@ -37,7 +57,7 @@ class UploadSafetyTest {
         when(repository.findById(1L)).thenReturn(Optional.of(new MunicipalProject()));
         ProjectPhotoService service = new ProjectPhotoService(
                 repository, access, mock(ProjectService.class), new MunicipalImageValidator(),
-                mock(LocalImageStorageService.class));
+                mock(LocalImageStorageService.class), 5);
 
         MockMultipartFile empty = new MockMultipartFile("photos", "photo.png", "image/png", new byte[0]);
         MockMultipartFile oversized = new MockMultipartFile(
@@ -57,7 +77,7 @@ class UploadSafetyTest {
         when(repository.findById(1L)).thenReturn(Optional.of(new MunicipalProject()));
         ProjectPhotoService service = new ProjectPhotoService(
                 repository, access, mock(ProjectService.class), new MunicipalImageValidator(),
-                mock(LocalImageStorageService.class));
+                mock(LocalImageStorageService.class), 5);
 
         MockMultipartFile mismatch = new MockMultipartFile(
                 "photos", "photo.jpg", "image/png", new byte[]{1, 2, 3});
@@ -88,7 +108,7 @@ class UploadSafetyTest {
         when(storage.store(validated, null)).thenReturn(stored);
         when(repository.save(project)).thenThrow(new IllegalStateException("database unavailable"));
         ProjectPhotoService service = new ProjectPhotoService(
-                repository, access, mock(ProjectService.class), validator, storage);
+                repository, access, mock(ProjectService.class), validator, storage, 5);
 
         assertThatThrownBy(() -> service.upload(1L, new MockMultipartFile[]{file}, actor))
                 .isInstanceOf(IllegalStateException.class);

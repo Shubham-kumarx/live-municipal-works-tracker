@@ -12,6 +12,7 @@ import com.municipal.tracker.repository.WardRepository;
 import lombok.RequiredArgsConstructor;
 import org.springframework.security.authentication.AuthenticationManager;
 import org.springframework.security.authentication.BadCredentialsException;
+import org.springframework.security.core.AuthenticationException;
 import org.springframework.security.authentication.UsernamePasswordAuthenticationToken;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Service;
@@ -30,6 +31,7 @@ public class AuthService {
     private final PasswordEncoder passwordEncoder;
     private final JwtUtil jwtUtil;
     private final AuthenticationManager authenticationManager;
+    private final LoginAttemptService loginAttemptService;
 
     // ── REGISTER ──────────────────────────────────
     @Transactional
@@ -93,16 +95,19 @@ public class AuthService {
 
     // ── LOGIN ──────────────────────────────────────
     @Transactional(readOnly = true)
-    public AuthResponse login(LoginRequest request) {
+    public AuthResponse login(LoginRequest request, String remoteAddress) {
 
-        // This line checks email + password automatically
-        // Throws exception if credentials are wrong
-        authenticationManager.authenticate(
-                new UsernamePasswordAuthenticationToken(
-                        request.getEmail(),
-                        request.getPassword()
-                )
-        );
+        loginAttemptService.checkAllowed(request.getEmail(), remoteAddress);
+
+        try {
+            authenticationManager.authenticate(
+                    new UsernamePasswordAuthenticationToken(
+                            request.getEmail(), request.getPassword()));
+        } catch (AuthenticationException exception) {
+            loginAttemptService.recordFailure(request.getEmail(), remoteAddress);
+            throw new BadCredentialsException("Invalid email or password");
+        }
+        loginAttemptService.recordSuccess(request.getEmail(), remoteAddress);
 
         // If we reach here — credentials are correct
         User user = userRepository.findByEmail(request.getEmail())

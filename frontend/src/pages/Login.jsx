@@ -1,6 +1,6 @@
 import { useState } from 'react'
 import { useNavigate, Link } from 'react-router-dom'
-import { landingPath } from '../auth/session'
+import { landingPath, setSessionUser } from '../auth/session'
 import api from '../api/axios'
 import { apiErrorMessage } from '../api/errors'
 
@@ -23,13 +23,7 @@ export default function Login() {
     setLoading(true)
     try {
       const res = await api.post('/api/auth/login', { email, password: form.password })
-      localStorage.setItem('token', res.data.token)
-      localStorage.setItem('user', JSON.stringify({
-        email: res.data.email,
-        fullName: res.data.fullName,
-        role: res.data.role,
-        wardId: res.data.wardId,
-      }))
+      setSessionUser(res.data)
       navigate(landingPath(res.data.role))
     } catch (err) {
       setError(apiErrorMessage(err, 'Invalid email or password'))

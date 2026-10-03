@@ -109,6 +109,7 @@ class PriorityCalculationServiceTest {
 
     @Test
     void classifiesEveryConfiguredThresholdBoundary() {
+        assertThat(service.classifyScore(-1.0)).isEqualTo(ProjectPriorityLevel.LOW);
         assertThat(service.classifyScore(0.0)).isEqualTo(ProjectPriorityLevel.LOW);
         assertThat(service.classifyScore(29.99)).isEqualTo(ProjectPriorityLevel.LOW);
         assertThat(service.classifyScore(30.0)).isEqualTo(ProjectPriorityLevel.MEDIUM);
@@ -117,6 +118,24 @@ class PriorityCalculationServiceTest {
         assertThat(service.classifyScore(74.99)).isEqualTo(ProjectPriorityLevel.HIGH);
         assertThat(service.classifyScore(75.0)).isEqualTo(ProjectPriorityLevel.CRITICAL);
         assertThat(service.classifyScore(100.0)).isEqualTo(ProjectPriorityLevel.CRITICAL);
+        assertThat(service.classifyScore(125.0)).isEqualTo(ProjectPriorityLevel.CRITICAL);
+    }
+
+    @Test
+    void keepsConfiguredWeightsAndFactorOrderWhenSomeFactorsAreUnavailable() {
+        MunicipalProject project = project(13L);
+
+        PriorityCalculationService.Calculation result = service.calculate(
+                project, List.of(), LocalDate.of(2026, 9, 27), LocalDateTime.of(2026, 9, 27, 12, 0));
+
+        assertThat(result.factors())
+                .extracting(PriorityCalculationService.FactorContribution::name)
+                .containsExactly("SEVERITY", "COMPLAINT_VOLUME", "IMPACT", "DEADLINE_RISK", "PROGRESS_GAP");
+        assertThat(result.factors())
+                .extracting(PriorityCalculationService.FactorContribution::weight)
+                .containsExactly(0.30, 0.20, 0.20, 0.15, 0.15);
+        assertThat(result.factors()).filteredOn(factor -> !factor.available())
+                .allSatisfy(factor -> assertThat(factor.weightedContribution()).isZero());
     }
 
     private MunicipalProject project(Long id) {

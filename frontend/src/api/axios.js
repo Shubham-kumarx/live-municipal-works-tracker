@@ -3,14 +3,26 @@ import { API_BASE_URL } from '../config/backend'
 
 const api = axios.create({
   baseURL: API_BASE_URL,
+  withCredentials: true,
+  withXSRFToken: true,
 })
 
-// Attach JWT token to every request automatically
-api.interceptors.request.use(config => {
-  const token = localStorage.getItem('token')
-  if (token) {
-    config.headers.Authorization = `Bearer ${token}`
+const csrfClient = axios.create({ baseURL: API_BASE_URL, withCredentials: true })
+let csrfRequest
+
+async function ensureCsrfToken() {
+  if (!csrfRequest) {
+    csrfRequest = csrfClient.get('/api/auth/csrf').catch(error => {
+      csrfRequest = null
+      throw error
+    })
   }
+  await csrfRequest
+}
+
+api.interceptors.request.use(async config => {
+  const method = (config.method || 'get').toLowerCase()
+  if (!['get', 'head', 'options'].includes(method)) await ensureCsrfToken()
   return config
 })
 
@@ -19,9 +31,8 @@ api.interceptors.response.use(
   response => response,
   error => {
     if (error.response?.status === 401) {
-      localStorage.removeItem('token')
       localStorage.removeItem('user')
-      window.location.href = '/login'
+      if (!error.config?.skipAuthRedirect) window.location.href = '/login'
     }
     return Promise.reject(error)
   }

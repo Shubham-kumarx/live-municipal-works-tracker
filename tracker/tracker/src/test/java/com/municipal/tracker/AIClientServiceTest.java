@@ -73,4 +73,51 @@ class AIClientServiceTest {
                 new MunicipalImageValidator.ValidatedImage("png", "image/png", new byte[]{1})))
                 .hasMessageContaining("AI analysis is temporarily unavailable");
     }
+
+    @Test
+    void translatesMalformedResponseToServiceUnavailable() throws Exception {
+        server = HttpServer.create(new InetSocketAddress("127.0.0.1", 0), 0);
+        server.createContext("/predict", exchange -> {
+            exchange.getRequestBody().readAllBytes();
+            byte[] body = "not-json".getBytes(StandardCharsets.UTF_8);
+            exchange.getResponseHeaders().add("Content-Type", "application/json");
+            exchange.sendResponseHeaders(200, body.length);
+            exchange.getResponseBody().write(body);
+            exchange.close();
+        });
+        server.start();
+        AIClientService client = new AIClientService("http://127.0.0.1:" + server.getAddress().getPort(),
+                Duration.ofSeconds(1), Duration.ofSeconds(1));
+
+        assertThatThrownBy(() -> client.analyze(image()))
+                .isInstanceOf(org.springframework.web.server.ResponseStatusException.class)
+                .hasMessageContaining("AI analysis is temporarily unavailable");
+    }
+
+    @Test
+    void translatesReadTimeoutToServiceUnavailable() throws Exception {
+        server = HttpServer.create(new InetSocketAddress("127.0.0.1", 0), 0);
+        server.createContext("/predict", exchange -> {
+            exchange.getRequestBody().readAllBytes();
+            try {
+                Thread.sleep(300);
+                exchange.sendResponseHeaders(204, -1);
+            } catch (InterruptedException exception) {
+                Thread.currentThread().interrupt();
+            } finally {
+                exchange.close();
+            }
+        });
+        server.start();
+        AIClientService client = new AIClientService("http://127.0.0.1:" + server.getAddress().getPort(),
+                Duration.ofSeconds(1), Duration.ofMillis(50));
+
+        assertThatThrownBy(() -> client.analyze(image()))
+                .isInstanceOf(org.springframework.web.server.ResponseStatusException.class)
+                .hasMessageContaining("continue with manual classification");
+    }
+
+    private MunicipalImageValidator.ValidatedImage image() {
+        return new MunicipalImageValidator.ValidatedImage("png", "image/png", new byte[]{1, 2, 3});
+    }
 }

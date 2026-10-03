@@ -100,6 +100,12 @@ public class ApiExceptionHandler {
         return response(HttpStatus.UNAUTHORIZED, "Invalid email or password", request, Map.of());
     }
 
+    @ExceptionHandler(TooManyLoginAttemptsException.class)
+    ResponseEntity<ApiErrorResponse> tooManyLoginAttempts(
+            TooManyLoginAttemptsException exception, HttpServletRequest request) {
+        return response(HttpStatus.TOO_MANY_REQUESTS, exception.getMessage(), request, Map.of());
+    }
+
     @ExceptionHandler(MaxUploadSizeExceededException.class)
     ResponseEntity<ApiErrorResponse> uploadTooLarge(HttpServletRequest request) {
         return response(HttpStatus.CONTENT_TOO_LARGE,
@@ -115,7 +121,8 @@ public class ApiExceptionHandler {
 
     @ExceptionHandler(Exception.class)
     ResponseEntity<ApiErrorResponse> unexpected(Exception exception, HttpServletRequest request) {
-        log.error("Unhandled API exception for {}", request.getRequestURI(), exception);
+        log.error("Unhandled API exception type={} path={}",
+                exception.getClass().getName(), request.getRequestURI());
         return response(HttpStatus.INTERNAL_SERVER_ERROR, "Unexpected server error", request, Map.of());
     }
 

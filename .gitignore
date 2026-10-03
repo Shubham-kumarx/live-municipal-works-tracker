@@ -3,7 +3,7 @@ ai-service/.model-cache/
 ai-service/.pytest_cache/
 ai-service/.venv/
 ai-service/**/__pycache__/
-uploads/complaints/
+uploads/
 # =========================
 # IDE / Editor
 # =========================
@@ -24,6 +24,13 @@ uploads/complaints/
 .env
 .env.*
 !.env.example
+*.pem
+*.key
+*.p12
+*.pfx
+*.jks
+*.keystore
+secrets/
 
 # =========================
 # Java / Maven

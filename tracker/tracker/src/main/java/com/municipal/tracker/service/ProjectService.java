@@ -5,6 +5,9 @@ import com.municipal.tracker.model.*;
 import com.municipal.tracker.repository.ProjectRepository;
 import com.municipal.tracker.repository.UserRepository;
 import com.municipal.tracker.repository.WardRepository;
+import com.municipal.tracker.repository.ProjectFlagRepository;
+import jakarta.persistence.EntityManager;
+import jakarta.persistence.LockModeType;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.messaging.simp.SimpMessagingTemplate;
@@ -29,6 +32,8 @@ public class ProjectService {
     private final UserRepository userRepository;
     private final SimpMessagingTemplate messagingTemplate;
     private final ProjectAccessService projectAccessService;
+    private final ProjectFlagRepository projectFlagRepository;
+    private final EntityManager entityManager;
 
     // ── CREATE ──────────────────────────────────
     @Transactional
@@ -191,11 +196,25 @@ public class ProjectService {
 
     // ── FLAG PROJECT ─────────────────────────────
     @Transactional
-    public MunicipalProject flagProject(Long projectId) {
+    public MunicipalProject flagProject(Long projectId, User actor) {
+        if (actor == null || actor.getRole() != Role.CITIZEN) {
+            throw new org.springframework.security.access.AccessDeniedException(
+                    "Only citizens can flag projects");
+        }
 
         MunicipalProject project = projectRepository.findById(projectId)
                 .orElseThrow(() -> new ResponseStatusException(NOT_FOUND,
                         "Project not found: " + projectId));
+
+        entityManager.lock(project, LockModeType.PESSIMISTIC_WRITE);
+        if (projectFlagRepository.existsByProjectIdAndCitizenId(projectId, actor.getId())) {
+            return project;
+        }
+
+        ProjectFlag flag = new ProjectFlag();
+        flag.setProject(project);
+        flag.setCitizen(actor);
+        projectFlagRepository.save(flag);
 
         project.setFlagged(true);
         project.setFlagCount(project.getFlagCount() + 1);

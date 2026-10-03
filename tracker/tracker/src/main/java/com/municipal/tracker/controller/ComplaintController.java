@@ -7,6 +7,7 @@ import com.municipal.tracker.dto.ComplaintLinkedProjectResponse;
 import com.municipal.tracker.dto.ProjectLinkOptionResponse;
 import com.municipal.tracker.model.User;
 import com.municipal.tracker.service.ComplaintService;
+import com.municipal.tracker.service.ComplaintImageAccessService;
 import com.municipal.tracker.service.ImageAnalysisService;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
@@ -33,6 +34,7 @@ import org.springframework.web.multipart.MultipartFile;
 public class ComplaintController {
     private final ImageAnalysisService imageAnalysisService;
     private final ComplaintService complaintService;
+    private final ComplaintImageAccessService complaintImageAccessService;
 
     @PostMapping("/analyze")
     @PreAuthorize("hasRole('CITIZEN')")
@@ -48,6 +50,14 @@ public class ComplaintController {
             @AuthenticationPrincipal User currentUser) {
         return ResponseEntity.status(HttpStatus.CREATED)
                 .body(complaintService.create(request, image, currentUser));
+    }
+
+    @GetMapping("/{complaintId}/image")
+    public ResponseEntity<byte[]> image(@PathVariable Long complaintId,
+            @AuthenticationPrincipal User currentUser) {
+        ComplaintImageAccessService.AuthorizedImage image =
+                complaintImageAccessService.load(complaintId, currentUser);
+        return ResponseEntity.ok().contentType(image.mediaType()).body(image.bytes());
     }
 
     @GetMapping("/{complaintId}/project")

@@ -29,12 +29,17 @@ public record ComplaintResponse(
         User reporter = complaint.getReportingUser();
         MunicipalProject project = complaint.getMunicipalProject();
         return new ComplaintResponse(
-                complaint.getId(), reporter.getId(), reporter.getFullName(), complaint.getImageUrl(),
+                complaint.getId(), reporter.getId(), reporter.getFullName(), imageUrl(complaint),
                 complaint.getDescription(), complaint.getLocationAddress(), complaint.getLatitude(),
                 complaint.getLongitude(), complaint.getAiPredictedIssueType(), complaint.getAiConfidence(),
                 complaint.getAiConfidenceLevel(), complaint.getAiSuggestedSeverity(),
                 complaint.getFinalIssueType(), complaint.getFinalSeverity(), complaint.getPredictionState(),
                 complaint.getStatus(), project == null ? null : project.getId(), complaint.getCreatedAt(),
                 complaint.getUpdatedAt());
+    }
+
+    private static String imageUrl(Complaint complaint) {
+        return complaint.getImageUrl() == null ? null
+                : "/api/complaints/" + complaint.getId() + "/image";
     }
 }
