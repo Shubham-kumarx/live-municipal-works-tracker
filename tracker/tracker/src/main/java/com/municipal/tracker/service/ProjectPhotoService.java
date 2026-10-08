@@ -3,6 +3,8 @@ package com.municipal.tracker.service;
 import com.municipal.tracker.model.MunicipalProject;
 import com.municipal.tracker.model.User;
 import com.municipal.tracker.repository.ProjectRepository;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Service;
 import org.springframework.web.multipart.MultipartFile;
@@ -14,6 +16,8 @@ import static org.springframework.http.HttpStatus.*;
 
 @Service
 public class ProjectPhotoService {
+    private static final Logger log = LoggerFactory.getLogger(ProjectPhotoService.class);
+
     private final ProjectRepository projectRepository;
     private final ProjectAccessService accessService;
     private final ProjectService projectService;
@@ -57,7 +61,11 @@ public class ProjectPhotoService {
             return saved;
         } catch (Exception exception) {
             created.forEach(stored -> {
-                try { storageService.delete(stored); } catch (RuntimeException ignored) { }
+                try {
+                    storageService.delete(stored);
+                } catch (RuntimeException cleanupException) {
+                    log.warn("Failed to remove stored image {} after upload rollback", stored.url(), cleanupException);
+                }
             });
             if (exception instanceof RuntimeException runtime) throw runtime;
             throw new ResponseStatusException(INTERNAL_SERVER_ERROR, "Photo upload failed");

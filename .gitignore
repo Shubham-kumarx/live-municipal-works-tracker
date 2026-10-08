@@ -4,6 +4,8 @@ ai-service/.pytest_cache/
 ai-service/.venv/
 ai-service/**/__pycache__/
 uploads/
+archive/
+ai-service/data/*.tmp
 # =========================
 # IDE / Editor
 # =========================

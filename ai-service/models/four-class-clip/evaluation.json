@@ -1,0 +1,163 @@
+{
+  "accuracy": 0.9956896551724138,
+  "classOrder": [
+    "DOMESTIC_TRASH",
+    "ILLEGAL_PARKING",
+    "DAMAGED_SIGN",
+    "POTHOLE"
+  ],
+  "classifierHeadSha256": "09a74a5426b11643b4d7826a57616bca6e8f57f0b1e6285a2f845a30ed052511",
+  "confidenceAnalysis": {
+    "bins": [
+      {
+        "correctCount": 1,
+        "count": 2,
+        "meanConfidence": 0.4053906053304672,
+        "observedAccuracy": 0.5,
+        "range": "[0.00, 0.50)"
+      },
+      {
+        "correctCount": 4,
+        "count": 4,
+        "meanConfidence": 0.5406104028224945,
+        "observedAccuracy": 1.0,
+        "range": "[0.50, 0.70)"
+      },
+      {
+        "correctCount": 27,
+        "count": 27,
+        "meanConfidence": 0.8434056904580858,
+        "observedAccuracy": 1.0,
+        "range": "[0.70, 0.90)"
+      },
+      {
+        "correctCount": 199,
+        "count": 199,
+        "meanConfidence": 0.9676074005251554,
+        "observedAccuracy": 1.0,
+        "range": "[0.90, 1.00]"
+      }
+    ],
+    "correct": {
+      "count": 231,
+      "maximum": 0.9939720034599304,
+      "mean": 0.9433638710222203,
+      "meanMargin": 0.9094132741276191,
+      "median": 0.9677520990371704,
+      "minimum": 0.4287862479686737
+    },
+    "incorrect": {
+      "count": 1,
+      "maximum": 0.38199496269226074,
+      "mean": 0.38199496269226074,
+      "meanMargin": 0.016047120094299316,
+      "median": 0.38199496269226074,
+      "minimum": 0.38199496269226074
+    },
+    "interpretation": "Softmax scores are relative model outputs and are not calibrated probabilities of real-world correctness.",
+    "overall": {
+      "count": 232,
+      "maximum": 0.9939720034599304,
+      "mean": 0.9409441774518326,
+      "meanMargin": 0.905562557946441,
+      "median": 0.9677131474018097,
+      "minimum": 0.38199496269226074
+    },
+    "perActualClass": {
+      "DAMAGED_SIGN": {
+        "count": 70,
+        "maximum": 0.988318145275116,
+        "mean": 0.9437932755265918,
+        "meanMargin": 0.9112208570154118,
+        "median": 0.9615367352962494,
+        "minimum": 0.5601327419281006
+      },
+      "DOMESTIC_TRASH": {
+        "count": 37,
+        "maximum": 0.9906837940216064,
+        "mean": 0.9225976322148297,
+        "meanMargin": 0.8743569197988993,
+        "median": 0.9570879340171814,
+        "minimum": 0.5224471688270569
+      },
+      "ILLEGAL_PARKING": {
+        "count": 96,
+        "maximum": 0.9939720034599304,
+        "mean": 0.9505892305945357,
+        "meanMargin": 0.9210291083096914,
+        "median": 0.9744972586631775,
+        "minimum": 0.4287862479686737
+      },
+      "POTHOLE": {
+        "count": 29,
+        "maximum": 0.9894940257072449,
+        "mean": 0.9255462535496416,
+        "meanMargin": 0.8805190697312355,
+        "median": 0.965041995048523,
+        "minimum": 0.38199496269226074
+      }
+    }
+  },
+  "confusionMatrix": [
+    [
+      37,
+      0,
+      0,
+      0
+    ],
+    [
+      0,
+      96,
+      0,
+      0
+    ],
+    [
+      0,
+      0,
+      70,
+      0
+    ],
+    [
+      0,
+      0,
+      1,
+      28
+    ]
+  ],
+  "correctCount": 231,
+  "loss": 0.07378250360488892,
+  "macroF1": 0.9938409854423292,
+  "macroPrecision": 0.9964788732394366,
+  "macroRecall": 0.9913793103448276,
+  "manifestSha256": "30b60f5d65e489aae154d4afd1b4a30da36028350e07bdcbf7c2d34bc0f21f3f",
+  "misclassificationCount": 1,
+  "perClass": {
+    "DAMAGED_SIGN": {
+      "f1": 0.9929078014184397,
+      "precision": 0.9859154929577465,
+      "recall": 1.0,
+      "support": 70
+    },
+    "DOMESTIC_TRASH": {
+      "f1": 1.0,
+      "precision": 1.0,
+      "recall": 1.0,
+      "support": 37
+    },
+    "ILLEGAL_PARKING": {
+      "f1": 1.0,
+      "precision": 1.0,
+      "recall": 1.0,
+      "support": 96
+    },
+    "POTHOLE": {
+      "f1": 0.9824561403508771,
+      "precision": 1.0,
+      "recall": 0.9655172413793104,
+      "support": 29
+    }
+  },
+  "sampleCount": 232,
+  "schemaVersion": 1,
+  "split": "test"
+}

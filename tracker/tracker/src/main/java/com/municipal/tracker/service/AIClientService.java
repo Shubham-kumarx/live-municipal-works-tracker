@@ -1,6 +1,8 @@
 package com.municipal.tracker.service;
 
 import com.municipal.tracker.dto.AIAnalysisResponse;
+import com.municipal.tracker.model.ComplaintCategory;
+import com.municipal.tracker.model.ComplaintIssueType;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.core.io.ByteArrayResource;
 import org.springframework.http.HttpEntity;
@@ -62,16 +64,26 @@ public class AIClientService {
     }
 
     private void validate(AIAnalysisResponse response) {
+        boolean lowConfidence = response != null
+                && response.confidenceLevel() == AIAnalysisResponse.ConfidenceLevel.LOW;
         if (response == null || response.candidateIssueType() == null
+                || !response.candidateIssueType().isSupportedClassification()
+                || (response.issueType() != null
+                    && !response.issueType().isSupportedClassification())
                 || response.confidenceLevel() == null || response.category() == null
                 || response.suggestedSeverity() == null || !Double.isFinite(response.confidence())
                 || response.confidence() < 0 || response.confidence() > 1
-                || (response.confidenceLevel() == AIAnalysisResponse.ConfidenceLevel.LOW
-                    && response.issueType() != null)
-                || (response.confidenceLevel() != AIAnalysisResponse.ConfidenceLevel.LOW
-                    && response.issueType() == null)) {
+                || (lowConfidence && response.issueType() != null)
+                || (!lowConfidence && response.issueType() != response.candidateIssueType())
+                || response.requiresManualReview() != lowConfidence
+                || response.category() != expectedCategory(response.candidateIssueType())) {
             throw unavailable();
         }
+    }
+
+    private ComplaintCategory expectedCategory(ComplaintIssueType issueType) {
+        return issueType == ComplaintIssueType.DOMESTIC_TRASH
+                ? ComplaintCategory.SANITATION : ComplaintCategory.ROAD;
     }
 
     private ResponseStatusException unavailable() {

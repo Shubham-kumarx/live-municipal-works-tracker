@@ -144,7 +144,7 @@ function detectNearestWard() {
             Create citizen account
           </h1>
           <p style={{ fontSize: 13, color: '#8A8F98' }}>
-            Free for residents · North Delhi Municipal Corporation
+            Register to report issues and monitor municipal work
           </p>
         </div>
 

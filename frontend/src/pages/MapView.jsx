@@ -4,6 +4,7 @@ import api from '../api/axios'
 import { apiErrorMessage } from '../api/errors'
 import { getSession } from '../auth/session'
 import { WS_URL } from '../config/backend'
+import { complaintIssueTypeLabel } from '../constants/complaintIssueTypes'
 import L from 'leaflet'
 import 'leaflet/dist/leaflet.css'
 import SockJS from 'sockjs-client/dist/sockjs'
@@ -624,7 +625,7 @@ export default function MapView() {
                 padding: '10px 12px', background: 'var(--bg-hover)'
               }}>
                 <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 6 }}>
-                  <span className="t-label">Advisory priority</span>
+                  <span className="t-label">Explainable weighted priority</span>
                   {priorityLoading && <span className="t-caption">Calculating...</span>}
                   {!priorityLoading && priority && (
                     <span className="badge" style={PRIORITY_STYLE[priority.priorityLevel]}>
@@ -640,7 +641,7 @@ export default function MapView() {
                 ) : !priorityLoading && priority && (
                   <>
                     <div style={{ fontSize: 18, fontWeight: 500 }}>{formatScore(priority.totalScore)}{hasScore(priority.totalScore) ? ' / 100' : ''}</div>
-                    <div className="t-caption">Decision-support score; not an official government formula.</div>
+                    <div className="t-caption">Advisory weighted score; not machine learning or an official government formula.</div>
                     {priority.factors?.length > 0 && (
                       <div className="priority-factor-list" aria-label="Priority score factors">
                         {priority.factors.map(factor => (
@@ -675,7 +676,7 @@ export default function MapView() {
                   display: 'flex', justifyContent: 'space-between',
                   alignItems: 'center', marginBottom: 8
                 }}>
-                  <span className="t-label">Delay risk</span>
+                  <span className="t-label">Rule-based delay risk</span>
                   {delayRiskLoading && (
                     <span style={{ fontSize: 11, color: 'var(--text-muted)' }}>Calculating...</span>
                   )}
@@ -746,7 +747,7 @@ export default function MapView() {
                         {complaint.imageUrl && <ProtectedComplaintImage url={complaint.imageUrl} />}
                         <div style={{ minWidth: 0 }}>
                           <div style={{ fontSize: 11.5, fontWeight: 500 }}>
-                            #{complaint.id} · {complaint.finalIssueType?.replaceAll('_', ' ')}
+                            #{complaint.id} · {complaintIssueTypeLabel(complaint.finalIssueType)}
                           </div>
                           <div className="t-caption">{complaint.finalSeverity} · {complaint.locationAddress}</div>
                           <div style={{ fontSize: 11, color: 'var(--text-secondary)', marginTop: 2 }}>
@@ -816,10 +817,6 @@ export default function MapView() {
                     📝 Log progress update
                   </button>
                 )}
-                <div style={{ display: 'flex', gap: 6 }}>
-                  <button className="btn btn-sm w-full">View full details</button>
-                  <button className="btn btn-sm w-full">Add photo</button>
-                </div>
               </div>
 
             </div>

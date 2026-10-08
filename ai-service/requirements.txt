@@ -1,6 +1,7 @@
 fastapi==0.116.1
 anyio==4.10.0
 httpx==0.28.1
+numpy==2.5.3
 pillow==11.3.0
 pytest==8.4.2
 python-multipart==0.0.20

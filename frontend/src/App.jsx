@@ -51,18 +51,6 @@ class AppErrorBoundary extends Component {
   }
 }
 
-function ComingSoon({ page }) {
-  return (
-    <div style={{ padding: 40, textAlign: 'center', color: 'var(--text-muted)' }}>
-      <div style={{ fontSize: 32, marginBottom: 12 }}>🚧</div>
-      <div style={{ fontSize: 16, fontWeight: 500, color: 'var(--text-primary)', marginBottom: 6 }}>
-        {page}
-      </div>
-      <div style={{ fontSize: 13 }}>This module is under development</div>
-    </div>
-  )
-}
-
 function PageLoading() {
   return (
     <main style={{ minHeight: '100vh', display: 'grid', placeItems: 'center', padding: 24 }}>
@@ -106,8 +94,6 @@ export default function App() {
                   {role === 'CITIZEN' ? <Complaints /> : <AdminComplaints />}
                 </ProtectedRoute>
               } />
-              <Route path="reports" element={<ProtectedRoute roles={['MUNICIPAL_ADMIN', 'WARD_OFFICER']}><ComingSoon page="Reports" /></ProtectedRoute>} />
-              <Route path="settings" element={<ProtectedRoute roles={['CITIZEN', 'FIELD_WORKER', 'WARD_OFFICER', 'MUNICIPAL_ADMIN']}><ComingSoon page="Settings" /></ProtectedRoute>} />
             </Route>
             <Route path="*" element={<Navigate to={role ? landingPath(role) : '/login'} replace />} />
           </Routes>

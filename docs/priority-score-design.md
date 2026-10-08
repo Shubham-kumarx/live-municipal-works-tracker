@@ -1,8 +1,8 @@
-# Explainable Municipal Work Priority Score
+# Explainable Weighted Priority Scoring
 
 ## Purpose
 
-This repository uses an advisory priority score to help users compare municipal projects from consistently recorded data. It is a college-project decision-support formula. It is not an official government formula, policy, service-level target, or replacement for human review.
+This repository uses explainable weighted priority scoring to help users compare municipal projects from consistently recorded data. It is configurable decision-support logic, not machine learning. It is not an official government formula, policy, service-level target, or replacement for human review.
 
 ## Available Data
 

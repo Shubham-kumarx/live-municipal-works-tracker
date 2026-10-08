@@ -1,0 +1,14 @@
+[
+  {
+    "actualLabel": "POTHOLE",
+    "confidence": 0.38199496269226074,
+    "confidenceMargin": 0.016047120094299316,
+    "groupId": "pothole-aaf7253f0f5dd63c",
+    "interpretation": "The retained POTHOLE ground truth may be visually ambiguous or mislabeled. The prediction is close: DAMAGED_SIGN and POTHOLE differ by only 0.0160.",
+    "predictedLabel": "DAMAGED_SIGN",
+    "relativePath": "archive/train/Road_Issues_Pothole/images207_jpg.rf.793529af5b8f6013aed916e07a154d92.jpg",
+    "runnerUpConfidence": 0.3659478425979614,
+    "runnerUpLabel": "POTHOLE",
+    "visualObservation": "The image is a close-up of a vertical cracked surface with a narrow opening; no road scene or road-surface depression is visible."
+  }
+]

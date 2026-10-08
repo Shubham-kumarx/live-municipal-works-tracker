@@ -19,8 +19,6 @@ const NAV = [
     section: 'Management',
     links: [
       { to: '/complaints', label: 'Complaints', icon: <IconAlert />, roles: ['CITIZEN', 'MUNICIPAL_ADMIN', 'WARD_OFFICER'] },
-      { to: '/reports', label: 'Reports', icon: <IconChart />, roles: ['MUNICIPAL_ADMIN', 'WARD_OFFICER'] },
-      { to: '/settings', label: 'Settings', icon: <IconSettings />, roles: ['CITIZEN', 'FIELD_WORKER', 'WARD_OFFICER', 'MUNICIPAL_ADMIN'] },
     ]
   }
 ]
@@ -41,7 +39,7 @@ export default function Shell() {
     <div className="shell">
       {mobileNavOpen && <button className="sidebar-overlay" aria-label="Close navigation"
         onClick={() => setMobileNavOpen(false)} />}
-      <aside className={`sidebar${mobileNavOpen ? ' sidebar-open' : ''}`}>
+      <aside id="app-sidebar" className={`sidebar${mobileNavOpen ? ' sidebar-open' : ''}`}>
         {/* Brand */}
         <div className="sidebar-brand">
           <div className="sidebar-brand-dot" />
@@ -64,7 +62,8 @@ export default function Shell() {
                     onClick={() => setMobileNavOpen(false)}
                   >
                     {link.icon}
-                    {link.label}
+                    {link.to === '/complaints' && user.role === 'CITIZEN'
+                      ? 'My Complaints' : link.label}
                   </NavLink>
                 ))}
               </div>
@@ -125,8 +124,10 @@ export default function Shell() {
       <div className="content-area">
         {/* Topbar */}
         <header className="topbar">
-          <button className="btn btn-ghost btn-sm mobile-nav-toggle" aria-label="Open navigation"
-            aria-expanded={mobileNavOpen} onClick={() => setMobileNavOpen(true)}>
+          <button className="btn btn-ghost btn-sm mobile-nav-toggle"
+            aria-label={mobileNavOpen ? 'Close navigation' : 'Open navigation'}
+            aria-controls="app-sidebar" aria-expanded={mobileNavOpen}
+            onClick={() => setMobileNavOpen(open => !open)}>
             <IconMenu />
           </button>
           <div className="topbar-date" style={{ display: 'flex', flexDirection: 'column' }}>
@@ -137,25 +138,11 @@ export default function Shell() {
               })}
             </span>
             <span style={{ fontSize: 11, color: 'var(--text-muted)' }}>
-              North Delhi Municipal Corporation
+              Municipal works monitoring and decision support
             </span>
           </div>
 
           <div style={{ marginLeft: 'auto', display: 'flex', alignItems: 'center', gap: 10 }}>
-            {/* Search */}
-            <div className="topbar-search" style={{ position: 'relative' }}>
-              <input
-                className="input input-sm"
-                placeholder="Search work orders, complaints..."
-                style={{ width: 240, paddingLeft: 28 }}
-              />
-              <IconSearch style={{
-                position: 'absolute', left: 8, top: '50%',
-                transform: 'translateY(-50%)',
-                width: 13, height: 13, color: 'var(--text-muted)'
-              }} />
-            </div>
-
             {/* Ward badge */}
             <div className="topbar-ward" style={{
               fontSize: 11.5, padding: '3px 10px',
@@ -167,10 +154,6 @@ export default function Shell() {
               {user.wardId ? `Ward ${user.wardId}` : 'No ward assigned'}
             </div>
 
-            {/* Notifications */}
-            <button className="btn btn-ghost btn-sm" style={{ padding: '4px 6px' }}>
-              <IconBell style={{ width: 15, height: 15 }} />
-            </button>
           </div>
         </header>
 
@@ -213,29 +196,9 @@ function IconAlert() {
     <path d="M8 1L1 14h14L8 1z"/><path d="M8 6v4M8 11.5v.5"/>
   </svg>
 }
-function IconChart() {
-  return <svg viewBox="0 0 16 16" fill="none" stroke="currentColor" strokeWidth="1.5">
-    <path d="M1 12l4-5 3 3 3-6 4 8"/><path d="M1 15h14"/>
-  </svg>
-}
-function IconSettings() {
-  return <svg viewBox="0 0 16 16" fill="none" stroke="currentColor" strokeWidth="1.5">
-    <circle cx="8" cy="8" r="2"/><path d="M8 1v2M8 13v2M1 8h2M13 8h2M3 3l1.4 1.4M11.6 11.6L13 13M3 13l1.4-1.4M11.6 4.4L13 3"/>
-  </svg>
-}
 function IconLogout() {
   return <svg viewBox="0 0 16 16" width="14" height="14" fill="none" stroke="currentColor" strokeWidth="1.5">
     <path d="M6 2H3a1 1 0 00-1 1v10a1 1 0 001 1h3M11 11l4-3-4-3M7 8h8"/>
-  </svg>
-}
-function IconSearch({ style }) {
-  return <svg style={style} viewBox="0 0 16 16" fill="none" stroke="currentColor" strokeWidth="1.5">
-    <circle cx="6.5" cy="6.5" r="4.5"/><path d="M10 10l3.5 3.5"/>
-  </svg>
-}
-function IconBell({ style }) {
-  return <svg style={style} viewBox="0 0 16 16" fill="none" stroke="currentColor" strokeWidth="1.5">
-    <path d="M8 1a5 5 0 015 5v3l1 2H2l1-2V6a5 5 0 015-5zM6.5 13a1.5 1.5 0 003 0"/>
   </svg>
 }
 function IconMenu() {

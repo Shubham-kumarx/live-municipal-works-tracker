@@ -64,31 +64,29 @@ export default function Login() {
             fontSize: 32, fontWeight: 500, color: '#E8E6E1',
             lineHeight: 1.2, marginBottom: 16, letterSpacing: -.5
           }}>
-            Municipal Operations<br />Management System
+            Smart Municipal Works<br />Monitoring and Decision-Support System
           </div>
           <div style={{ fontSize: 14, color: '#6B7280', lineHeight: 1.8, maxWidth: 400 }}>
-            Real-time tracking of civic infrastructure work orders,
-            field team coordination, and complaint resolution
-            for North Delhi Municipal Corporation.
+            AI-assisted issue classification, human-confirmed reporting,
+            live work monitoring, and explainable administrative decision support.
           </div>
         </div>
 
-        {/* Sample stats row */}
+        {/* Supported workflow */}
         <div style={{
           display: 'grid', gridTemplateColumns: 'repeat(3,1fr)',
           gap: 0, borderTop: '1px solid #2E3238', paddingTop: 32
         }}>
-          <div style={{ gridColumn: '1 / -1', fontSize: 10, color: '#6B7280', marginBottom: 8 }}>Sample interface metrics</div>
+          <div style={{ gridColumn: '1 / -1', fontSize: 10, color: '#6B7280', marginBottom: 8 }}>Integrated decision-support workflow</div>
           {[
-            { num: '14', label: 'Wards covered' },
-            { num: '340+', label: 'Active work orders' },
-            { num: '86', label: 'Field workers' },
+            'Issue reporting',
+            'Work monitoring',
+            'Human review',
           ].map(s => (
-            <div key={s.label} style={{ paddingRight: 24 }}>
-              <div style={{ fontSize: 26, fontWeight: 500, color: '#E8E6E1', fontVariantNumeric: 'tabular-nums' }}>
-                {s.num}
+            <div key={s} style={{ paddingRight: 24 }}>
+              <div style={{ fontSize: 12, fontWeight: 500, color: '#E8E6E1', lineHeight: 1.5 }}>
+                {s}
               </div>
-              <div style={{ fontSize: 11.5, color: '#6B7280', marginTop: 3 }}>{s.label}</div>
             </div>
           ))}
         </div>
@@ -106,7 +104,7 @@ export default function Login() {
             Sign in
           </h1>
           <p style={{ fontSize: 13, color: '#8A8F98' }}>
-            North Delhi Municipal Corporation · Officer portal
+            Secure access for citizens and authorized municipal staff
           </p>
         </div>
 
@@ -120,7 +118,7 @@ export default function Login() {
             <input
               className="input"
               type="email"
-              placeholder="officer@ndmc.gov.in"
+              placeholder="name@example.com"
               value={form.email}
               onChange={e => setForm({ ...form, email: e.target.value })}
               autoComplete="email"
@@ -180,7 +178,7 @@ export default function Login() {
 
         {/* Footer */}
         <div style={{ marginTop: 24, fontSize: 11.5, color: '#8A8F98', textAlign: 'center' }}>
-          North Delhi Municipal Corporation · Internal system<br />
+          Municipal works monitoring and decision-support system<br />
           Unauthorized access is prohibited
         </div>
         <div style={{ marginTop: 16, fontSize: 12.5, color: '#8A8F98', textAlign: 'center' }}>

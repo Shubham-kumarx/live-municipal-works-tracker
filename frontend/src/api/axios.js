@@ -10,6 +10,9 @@ const csrfClient = axios.create({ baseURL: API_BASE_URL, withCredentials: true }
 let csrfRequest
 let csrfToken
 
+const isUnsafeRequest = config =>
+  !['get', 'head', 'options'].includes((config?.method || 'get').toLowerCase())
+
 async function ensureCsrfToken() {
   if (csrfToken) return csrfToken
   if (!csrfRequest) {
@@ -35,9 +38,12 @@ api.interceptors.request.use(async config => {
 
 // If token expires redirect to login
 api.interceptors.response.use(
-  response => response,
+  response => {
+    if (isUnsafeRequest(response.config)) csrfToken = null
+    return response
+  },
   error => {
-    if (error.response?.status === 403) csrfToken = null
+    if (isUnsafeRequest(error.config)) csrfToken = null
     if (error.response?.status === 401) {
       localStorage.removeItem('user')
       if (!error.config?.skipAuthRedirect) window.location.href = '/login'

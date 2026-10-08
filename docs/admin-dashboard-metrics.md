@@ -1,6 +1,6 @@
 # Admin Dashboard Metrics
 
-The admin dashboard is decision-support software for this project. Its priority score is advisory and is not an official government formula.
+The admin dashboard is decision-support software for this project. It uses Explainable Weighted Priority Scoring: configurable weighted rules rather than machine learning. The score is advisory and is not an official government formula.
 
 ## Access scope
 
@@ -14,9 +14,9 @@ The admin dashboard is decision-support software for this project. Its priority 
 - **Completed:** projects whose status is `COMPLETED`.
 - **Delayed:** projects whose status is `DELAYED`.
 - **High priority:** projects whose calculated priority is `HIGH` or `CRITICAL`.
-- **High delay risk:** projects whose available rule-based delay risk is `HIGH_DELAY_RISK`.
+- **High delay risk:** projects whose available Rule-Based Delay Risk Detection result is `HIGH_DELAY_RISK`.
 
-Priority and delay risk use the existing configured Phase 4 and Phase 5 calculations. An unavailable delay-risk result is shown as unavailable and is not counted as high risk.
+Priority and Rule-Based Delay Risk Detection use the existing configured Phase 4 and Phase 5 calculations. Delay risk is threshold-based decision support, not a machine-learning forecast. An unavailable result is shown as unavailable and is not counted as high risk.
 
 ## Complaint metrics
 

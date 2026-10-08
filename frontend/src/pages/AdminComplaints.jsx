@@ -2,6 +2,7 @@ import { useCallback, useEffect, useState } from 'react'
 import { Link } from 'react-router-dom'
 import api from '../api/axios'
 import { apiErrorMessage } from '../api/errors'
+import { complaintIssueTypeLabel } from '../constants/complaintIssueTypes'
 
 const label = value => value?.replaceAll('_', ' ').toLowerCase().replace(/^./, c => c.toUpperCase())
 
@@ -17,6 +18,7 @@ export default function AdminComplaints() {
   const loadData = useCallback(async () => {
     setLoading(true)
     setError('')
+    setSuccess('')
     try {
       const [complaintResponse, projectResponse] = await Promise.all([
         api.get('/api/complaints'),
@@ -74,11 +76,12 @@ export default function AdminComplaints() {
         <button className="btn btn-sm" onClick={loadData} disabled={loading}>Refresh</button>
       </div>
 
-      {error && <div className="complaint-message complaint-error" role="alert">
-        {error} <button className="btn btn-ghost btn-sm" onClick={loadData}>Retry</button>
-      </div>}
       {success && <div className="complaint-message complaint-success" role="status">{success}</div>}
-      {loading ? (
+      {error ? (
+        <div className="complaint-message complaint-error" role="alert">
+          {error} <button className="btn btn-ghost btn-sm" onClick={loadData}>Retry</button>
+        </div>
+      ) : loading ? (
         <div className="panel"><div className="panel-body t-caption">Loading complaints...</div></div>
       ) : complaints.length === 0 ? (
         <div className="panel"><div className="panel-body t-caption">No complaints are available.</div></div>
@@ -95,7 +98,7 @@ export default function AdminComplaints() {
                 return (
                   <tr key={complaint.id}>
                     <td className="col-id">#{complaint.id}</td>
-                    <td><div style={{ fontWeight: 500 }}>{label(complaint.finalIssueType)}</div>
+                    <td><div style={{ fontWeight: 500 }}>{complaintIssueTypeLabel(complaint.finalIssueType)}</div>
                       <div className="t-caption">{complaint.description}</div></td>
                     <td>{label(complaint.finalSeverity)}</td>
                     <td>{complaint.locationAddress}</td>

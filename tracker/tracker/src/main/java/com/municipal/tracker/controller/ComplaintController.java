@@ -70,6 +70,13 @@ public class ComplaintController {
                 .orElseGet(() -> ResponseEntity.noContent().build());
     }
 
+    @GetMapping("/my")
+    @PreAuthorize("hasRole('CITIZEN')")
+    public ResponseEntity<List<ComplaintResponse>> listMine(
+            @AuthenticationPrincipal User currentUser) {
+        return ResponseEntity.ok(complaintService.listForCitizen(currentUser));
+    }
+
     @GetMapping
     @PreAuthorize("hasAnyRole('WARD_OFFICER','MUNICIPAL_ADMIN')")
     public ResponseEntity<List<ComplaintResponse>> list(

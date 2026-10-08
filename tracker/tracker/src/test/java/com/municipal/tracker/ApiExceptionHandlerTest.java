@@ -4,10 +4,12 @@ import com.municipal.tracker.dto.ApiErrorResponse;
 import jakarta.servlet.http.HttpServletRequest;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
+import org.springframework.http.HttpMethod;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.access.AccessDeniedException;
 import org.springframework.web.server.ResponseStatusException;
+import org.springframework.web.servlet.resource.NoResourceFoundException;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.mockito.Mockito.mock;
@@ -28,6 +30,13 @@ class ApiExceptionHandlerTest {
                 404, "Project not found: 99");
         assertResponse(handler.status(new ResponseStatusException(
                 HttpStatus.SERVICE_UNAVAILABLE, "AI unavailable"), request), 503, "AI unavailable");
+    }
+
+    @Test
+    void mapsUnknownApiRouteToNotFound() {
+        assertResponse(handler.routeNotFound(
+                new NoResourceFoundException(HttpMethod.GET, "/api/does-not-exist", "static locations"), request),
+                404, "API endpoint not found");
     }
 
     @Test

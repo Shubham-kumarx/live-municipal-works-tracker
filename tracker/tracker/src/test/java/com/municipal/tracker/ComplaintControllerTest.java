@@ -132,6 +132,23 @@ class ComplaintControllerTest {
     }
 
     @Test
+    @WithMockUser(roles = "CITIZEN")
+    void legacyIssueTypeCannotBeUsedForNewComplaint() throws Exception {
+        MockMultipartFile request = new MockMultipartFile("complaint", "", "application/json", """
+                {"description":"Road damage","locationAddress":"Test Road","finalIssueType":"ROAD_CRACK",
+                 "finalSeverity":"HIGH","predictionState":"MANUAL"}
+                """.getBytes());
+        MockMultipartFile image = new MockMultipartFile(
+                "image", "road.png", "image/png", new byte[]{1, 2, 3});
+
+        mockMvc.perform(multipart("/api/complaints").file(request).file(image))
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.message").value(
+                        "Final issue type must be DOMESTIC_TRASH, ILLEGAL_PARKING, DAMAGED_SIGN, or POTHOLE"))
+                .andExpect(jsonPath("$.status").value(400));
+    }
+
+    @Test
     @WithMockUser(roles = "WARD_OFFICER")
     void managerCanListComplaintsAsSafeResponseDtos() throws Exception {
         ComplaintResponse complaint = new ComplaintResponse(44L, 5L, "Citizen",
@@ -151,6 +168,29 @@ class ComplaintControllerTest {
     @WithMockUser(roles = "CITIZEN")
     void citizenCannotUseAdministrativeComplaintList() throws Exception {
         mockMvc.perform(get("/api/complaints"))
+                .andExpect(status().isForbidden());
+    }
+
+    @Test
+    @WithMockUser(roles = "CITIZEN")
+    void citizenCanListOwnComplaints() throws Exception {
+        ComplaintResponse complaint = new ComplaintResponse(45L, 5L, "Citizen",
+                "/uploads/complaints/test.png", "Pothole", "Test Road", null, null,
+                null, null, null, null, ComplaintIssueType.POTHOLE, ComplaintSeverity.HIGH,
+                ComplaintPredictionState.MANUAL, ComplaintStatus.SUBMITTED, null,
+                LocalDateTime.now(), LocalDateTime.now());
+        when(complaintService.listForCitizen(nullable(User.class))).thenReturn(List.of(complaint));
+
+        mockMvc.perform(get("/api/complaints/my"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$[0].id").value(45))
+                .andExpect(jsonPath("$[0].reportingUserId").value(5));
+    }
+
+    @Test
+    @WithMockUser(roles = "MUNICIPAL_ADMIN")
+    void managerCannotUseCitizenComplaintList() throws Exception {
+        mockMvc.perform(get("/api/complaints/my"))
                 .andExpect(status().isForbidden());
     }
 

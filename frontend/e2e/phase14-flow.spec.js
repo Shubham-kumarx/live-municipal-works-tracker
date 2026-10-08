@@ -33,13 +33,13 @@ test('citizen previews the image and receives real AI analysis', async ({ page }
   await expect.poll(() => preview.evaluate(image => image.naturalWidth)).toBeGreaterThan(0)
 
   await page.getByRole('button', { name: 'Analyze image' }).click()
-  await expect(page.getByText('AI suggestion', { exact: true })).toBeVisible({ timeout: 120_000 })
+  await expect(page.getByText('AI-assisted suggestion', { exact: true })).toBeVisible({ timeout: 120_000 })
   const suggestion = page.locator('.complaint-panel').filter({
-    has: page.getByText('AI suggestion', { exact: true }),
+    has: page.getByText('AI-assisted suggestion', { exact: true }),
   })
   await expect(suggestion.getByText(/^(HIGH|MEDIUM|LOW) confidence$/)).toBeVisible()
-  await expect(suggestion.getByText('Road crack', { exact: true })).toBeVisible()
-  await expect(suggestion.getByText('52.7%', { exact: true })).toBeVisible()
+  await expect(suggestion.getByText('Pothole', { exact: true })).toBeVisible()
+  await expect(suggestion.getByText(/^\d{1,3}\.\d%$/)).toBeVisible()
   await expect(suggestion.getByText('High', { exact: true })).toBeVisible()
 })
 

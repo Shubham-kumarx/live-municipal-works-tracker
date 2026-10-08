@@ -33,6 +33,7 @@ public class ComplaintService {
         if (actor == null || actor.getRole() != Role.CITIZEN) {
             throw new AccessDeniedException("Only citizens can submit complaints");
         }
+        validateIssueTypes(request);
         validatePredictionState(request);
         ComplaintImageService.StoredComplaintImage stored = complaintImageService.store(image);
         try {
@@ -130,6 +131,16 @@ public class ComplaintService {
     }
 
     @Transactional(readOnly = true)
+    public List<ComplaintResponse> listForCitizen(User actor) {
+        if (actor == null || actor.getRole() != Role.CITIZEN) {
+            throw new AccessDeniedException("Only citizens can access their submitted complaints");
+        }
+        return complaintRepository.findByReportingUserIdOrderByCreatedAtDesc(actor.getId()).stream()
+                .map(ComplaintResponse::from)
+                .toList();
+    }
+
+    @Transactional(readOnly = true)
     public List<ComplaintResponse> listForManager(User actor) {
         requireManager(actor);
         List<Complaint> complaints = actor.getRole() == Role.MUNICIPAL_ADMIN
@@ -189,6 +200,19 @@ public class ComplaintService {
                 && (request.finalIssueType() != request.aiPredictedIssueType()
                     || request.finalSeverity() != request.aiSuggestedSeverity())) {
             throw new IllegalArgumentException("Confirmed classification must match the AI suggestion");
+        }
+    }
+
+    private void validateIssueTypes(ComplaintCreateRequest request) {
+        if (request.finalIssueType() == null
+                || !request.finalIssueType().isSupportedClassification()) {
+            throw new IllegalArgumentException(
+                    "Final issue type must be DOMESTIC_TRASH, ILLEGAL_PARKING, DAMAGED_SIGN, or POTHOLE");
+        }
+        if (request.aiPredictedIssueType() != null
+                && !request.aiPredictedIssueType().isSupportedClassification()) {
+            throw new IllegalArgumentException(
+                    "AI predicted issue type must be DOMESTIC_TRASH, ILLEGAL_PARKING, DAMAGED_SIGN, or POTHOLE");
         }
     }
 }
