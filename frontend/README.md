@@ -1,16 +1,28 @@
-# React + Vite
+# Municipal Works Decision-Support Frontend
 
-This template provides a minimal setup to get React working in Vite with HMR and some Oxlint rules.
+This React and Vite frontend is the user interface for the **Smart Municipal Works
+Monitoring and Decision-Support System with AI-Assisted Issue Classification**.
 
-Currently, two official plugins are available:
+It supports:
 
-- [@vitejs/plugin-react](https://github.com/vitejs/vite-plugin-react/blob/main/packages/plugin-react) uses [Oxc](https://oxc.rs)
-- [@vitejs/plugin-react-swc](https://github.com/vitejs/vite-plugin-react/blob/main/packages/plugin-react-swc) uses [SWC](https://swc.rs/)
+- citizen issue reporting with image preview;
+- AI-assisted classification followed by human confirmation or correction;
+- complaint and municipal-work association for authorized administrators;
+- live municipal work monitoring;
+- Explainable Weighted Priority Scoring;
+- Rule-Based Delay Risk Detection;
+- an administrative decision-support dashboard built from backend records.
 
-## React Compiler
+The frontend presents advisory results. Backend authorization remains authoritative, and
+human users remain responsible for final complaint classifications and administrative
+decisions.
 
-The React Compiler is not enabled on this template because of its impact on dev & build performances. To add it, see [this documentation](https://react.dev/learn/react-compiler/installation).
+## Local commands
 
-## Expanding the Oxlint configuration
-
-If you are developing a production application, we recommend using TypeScript with type-aware lint rules enabled. Check out the [TS template](https://github.com/vitejs/vite/tree/main/packages/create-vite/template-react-ts) for information on how to integrate TypeScript and Oxlint's TypeScript related rules in your project.
+```powershell
+npm install
+npm run dev
+npm test
+npm run lint
+npm run build
+```

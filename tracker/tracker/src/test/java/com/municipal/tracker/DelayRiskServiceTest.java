@@ -5,9 +5,11 @@ import com.municipal.tracker.config.PriorityProperties;
 import com.municipal.tracker.model.DelayRisk;
 import com.municipal.tracker.model.MunicipalProject;
 import com.municipal.tracker.model.ProjectStatus;
+import com.municipal.tracker.model.User;
 import com.municipal.tracker.repository.ProjectRepository;
 import com.municipal.tracker.service.DelayRiskService;
 import com.municipal.tracker.service.PriorityFactorCalculator;
+import com.municipal.tracker.service.ProjectAccessService;
 import org.junit.jupiter.api.Test;
 import org.springframework.web.server.ResponseStatusException;
 
@@ -22,8 +24,9 @@ import static org.mockito.Mockito.*;
 class DelayRiskServiceTest {
     private final ProjectRepository projects = mock(ProjectRepository.class);
     private final PriorityFactorCalculator factors = mock(PriorityFactorCalculator.class);
+    private final ProjectAccessService access = mock(ProjectAccessService.class);
     private final DelayRiskService service = new DelayRiskService(
-            projects, factors, new DelayRiskProperties());
+            projects, factors, new DelayRiskProperties(), access);
 
     @Test
     void reusesExpectedProgressAndProgressGapCalculations() {
@@ -205,9 +208,20 @@ class DelayRiskServiceTest {
                 .hasMessageContaining("404 NOT_FOUND");
     }
 
+    @Test
+    void actorCalculationChecksProjectAccess() {
+        MunicipalProject project = activeProject(12L, LocalDate.of(2026, 10, 10), 25);
+        User actor = new User();
+        when(projects.findById(12L)).thenReturn(Optional.of(project));
+
+        realService().calculateForActor(12L, actor);
+
+        verify(access).requireProjectWardAccess(actor, project);
+    }
+
     private DelayRiskService realService() {
         return new DelayRiskService(projects,
-                new PriorityFactorCalculator(new PriorityProperties()), new DelayRiskProperties());
+                new PriorityFactorCalculator(new PriorityProperties()), new DelayRiskProperties(), access);
     }
 
     private MunicipalProject activeProject(Long id, LocalDate expectedEndDate, Integer progress) {

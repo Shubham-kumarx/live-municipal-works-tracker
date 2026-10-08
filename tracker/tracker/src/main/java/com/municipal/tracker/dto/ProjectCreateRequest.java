@@ -24,6 +24,11 @@ public class ProjectCreateRequest {
     private LocalDate expectedEndDate;
     private ProjectImpactLevel impactLevel;
 
+    @AssertTrue(message = "Expected end date cannot be before start date")
+    public boolean isDateRangeValid() {
+        return startDate == null || expectedEndDate == null || !expectedEndDate.isBefore(startDate);
+    }
+
     public MunicipalProject toEntity() {
         MunicipalProject project = new MunicipalProject();
         project.setProjectName(projectName); project.setDescription(description); project.setProjectType(projectType);

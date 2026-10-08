@@ -12,6 +12,8 @@ import org.junit.jupiter.api.Test;
 import org.springframework.mock.web.MockMultipartFile;
 
 import java.nio.file.Path;
+import java.time.LocalDateTime;
+import java.util.List;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
@@ -34,7 +36,7 @@ class ComplaintServiceTest {
             Complaint complaint = invocation.getArgument(0); complaint.setId(12L); return complaint;
         });
         ComplaintCreateRequest request = new ComplaintCreateRequest("Blocked drain", "Test Road",
-                null, null, null, null, null, null, ComplaintIssueType.WATERLOGGING,
+                null, null, null, null, null, null, ComplaintIssueType.DOMESTIC_TRASH,
                 ComplaintSeverity.HIGH, ComplaintPredictionState.MANUAL);
 
         ComplaintResponse response = service.create(request,
@@ -55,6 +57,57 @@ class ComplaintServiceTest {
         assertThatThrownBy(() -> service.create(request, mock(MockMultipartFile.class), citizen()))
                 .isInstanceOf(IllegalArgumentException.class);
         verifyNoInteractions(images, repository);
+    }
+
+    @Test
+    void rejectsLegacyIssueTypeBeforeWritingImage() {
+        ComplaintCreateRequest request = new ComplaintCreateRequest("Issue", "Road", null, null,
+                null, null, null, null, ComplaintIssueType.ROAD_CRACK,
+                ComplaintSeverity.HIGH, ComplaintPredictionState.MANUAL);
+
+        assertThatThrownBy(() -> service.create(request, mock(MockMultipartFile.class), citizen()))
+                .isInstanceOf(IllegalArgumentException.class)
+                .hasMessageContaining("Final issue type must be");
+        verifyNoInteractions(images, repository);
+    }
+
+    @Test
+    void listsOnlyComplaintsOwnedByAuthenticatedCitizen() {
+        User citizen = citizen();
+        Complaint complaint = new Complaint();
+        complaint.setId(15L);
+        complaint.setReportingUser(citizen);
+        complaint.setImageUrl("/uploads/complaints/owned.png");
+        complaint.setDescription("Owned complaint");
+        complaint.setLocationAddress("Citizen Road");
+        complaint.setFinalIssueType(ComplaintIssueType.POTHOLE);
+        complaint.setFinalSeverity(ComplaintSeverity.HIGH);
+        complaint.setPredictionState(ComplaintPredictionState.MANUAL);
+        complaint.setStatus(ComplaintStatus.SUBMITTED);
+        complaint.setCreatedAt(LocalDateTime.now());
+        complaint.setUpdatedAt(LocalDateTime.now());
+        when(repository.findByReportingUserIdOrderByCreatedAtDesc(5L))
+                .thenReturn(List.of(complaint));
+
+        List<ComplaintResponse> responses = service.listForCitizen(citizen);
+
+        assertThat(responses).extracting(ComplaintResponse::reportingUserId)
+                .containsExactly(5L);
+        assertThat(responses).extracting(ComplaintResponse::description)
+                .containsExactly("Owned complaint");
+        verify(repository).findByReportingUserIdOrderByCreatedAtDesc(5L);
+        verify(repository, never()).findAllByOrderByCreatedAtDesc();
+    }
+
+    @Test
+    void rejectsNonCitizenFromCitizenComplaintService() {
+        User admin = new User();
+        admin.setId(1L);
+        admin.setRole(Role.MUNICIPAL_ADMIN);
+
+        assertThatThrownBy(() -> service.listForCitizen(admin))
+                .isInstanceOf(org.springframework.security.access.AccessDeniedException.class);
+        verifyNoInteractions(repository);
     }
 
     @Test

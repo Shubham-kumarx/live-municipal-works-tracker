@@ -1,5 +1,6 @@
 import { useState, useRef } from 'react'
 import api from '../api/axios'
+import { apiErrorMessage } from '../api/errors'
 
 const MAX_PHOTO_BYTES = 10 * 1024 * 1024
 const MAX_PHOTOS = 3
@@ -117,8 +118,8 @@ export default function FieldUpdateForm({ project, onClose, onUpdated }) {
       onClose()
     } catch (err) {
       setError(saved
-        ? `Status was saved, but photos failed: ${err.response?.data?.message || 'Try the upload again.'}`
-        : (err.response?.data?.message || 'Update failed. Try again.'))
+        ? `Status was saved, but photos failed: ${apiErrorMessage(err, 'Try the upload again.')}`
+        : apiErrorMessage(err, 'Update failed. Try again.'))
     } finally {
       setSubmitting(false)
     }

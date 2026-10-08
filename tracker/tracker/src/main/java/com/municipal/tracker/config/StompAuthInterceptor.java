@@ -28,15 +28,22 @@ public class StompAuthInterceptor implements ChannelInterceptor {
         StompHeaderAccessor accessor = StompHeaderAccessor.wrap(message);
         if (accessor.getCommand() == StompCommand.CONNECT) authenticate(accessor);
         if (accessor.getCommand() == StompCommand.SUBSCRIBE) authorizeSubscription(accessor);
-        if (accessor.getCommand() == StompCommand.SEND
-                && accessor.getDestination() != null
-                && accessor.getDestination().startsWith("/topic/")) {
-            throw new AccessDeniedException("Clients cannot publish to broker topics");
+        if (accessor.getCommand() == StompCommand.SEND) {
+            throw new AccessDeniedException("Client messages are not supported");
         }
         return message;
     }
 
     private void authenticate(StompHeaderAccessor accessor) {
+        if (accessor.getUser() instanceof UsernamePasswordAuthenticationToken existing
+                && existing.getPrincipal() instanceof User handshakeUser) {
+            User currentUser = userRepository.findByEmail(handshakeUser.getEmail())
+                    .filter(User::isEnabled)
+                    .orElseThrow(() -> new AccessDeniedException("Invalid user"));
+            accessor.setUser(new UsernamePasswordAuthenticationToken(
+                    currentUser, null, currentUser.getAuthorities()));
+            return;
+        }
         String header = accessor.getFirstNativeHeader("Authorization");
         if (header == null || !header.startsWith("Bearer ")) {
             throw new AccessDeniedException("A bearer token is required");

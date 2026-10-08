@@ -13,7 +13,9 @@ public record LinkedComplaintResponse(
         ComplaintStatus status,
         LocalDateTime createdAt) {
     public static LinkedComplaintResponse from(Complaint complaint) {
-        return new LinkedComplaintResponse(complaint.getId(), complaint.getImageUrl(),
+        String protectedImageUrl = complaint.getImageUrl() == null ? null
+                : "/api/complaints/" + complaint.getId() + "/image";
+        return new LinkedComplaintResponse(complaint.getId(), protectedImageUrl,
                 complaint.getDescription(), complaint.getLocationAddress(), complaint.getFinalIssueType(),
                 complaint.getFinalSeverity(), complaint.getStatus(), complaint.getCreatedAt());
     }

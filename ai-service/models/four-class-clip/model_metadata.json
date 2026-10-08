@@ -1,0 +1,70 @@
+{
+  "architecture": "CLIP_VIT_B32_FROZEN_LINEAR_PROBE",
+  "assignmentDigest": "d7d7670e5aaa96466b168056767068f0cd3de85b4f9050d60899673b8e193435",
+  "augmentation": {
+    "brightnessFactor": [
+      0.9,
+      1.1
+    ],
+    "contrastFactor": [
+      0.9,
+      1.1
+    ],
+    "horizontalFlip": false,
+    "randomCropFraction": [
+      0.9,
+      1.0
+    ],
+    "rotationDegrees": [
+      -5.0,
+      5.0
+    ],
+    "viewsPerTrainingImage": 2
+  },
+  "baseModelId": "openai/clip-vit-base-patch32",
+  "baseModelRevision": "3d74acf9a28c67741b2f4f2ea7635f0aaf6f0268",
+  "bestEpoch": 50,
+  "bestValidationMacroF1": 0.9944538113408465,
+  "classLabels": [
+    "DOMESTIC_TRASH",
+    "ILLEGAL_PARKING",
+    "DAMAGED_SIGN",
+    "POTHOLE"
+  ],
+  "classToIndex": {
+    "DAMAGED_SIGN": 2,
+    "DOMESTIC_TRASH": 0,
+    "ILLEGAL_PARKING": 1,
+    "POTHOLE": 3
+  },
+  "classifierHeadSha256": "09a74a5426b11643b4d7826a57616bca6e8f57f0b1e6285a2f845a30ed052511",
+  "embeddingSize": 512,
+  "fineTuning": {
+    "decision": "SKIPPED_LINEAR_PROBE_ALREADY_EFFECTIVE",
+    "performed": false,
+    "reason": "The frozen-backbone head achieved at least 0.98 validation macro-F1 with no material train/validation gap; unfreezing CLIP would add overfitting risk for little measurable validation headroom.",
+    "trainingValidationMacroF1Gap": 0.0042846047299870405,
+    "validationMacroF1": 0.9944538113408465
+  },
+  "inputImageSize": 224,
+  "inventorySha256": "a159ed5132d22e541b0b0730e63055fa0483488c6da9309733f0121954794c9d",
+  "loss": "inverse-frequency class-weighted cross entropy",
+  "manifestSha256": "30b60f5d65e489aae154d4afd1b4a30da36028350e07bdcbf7c2d34bc0f21f3f",
+  "optimizer": "AdamW",
+  "schemaVersion": 1,
+  "selectionMetric": "validationMacroF1",
+  "selectionTieBreaker": "validationLoss",
+  "trainingConfiguration": {
+    "batch_size": 64,
+    "epochs": 50,
+    "feature_batch_size": 16,
+    "image_size": 224,
+    "learning_rate": 0.001,
+    "minimum_improvement": 1e-06,
+    "patience": 8,
+    "seed": 2026,
+    "weight_decay": 0.01
+  },
+  "trainingDevice": "cpu",
+  "trainingDurationSeconds": 278.53949849999844
+}

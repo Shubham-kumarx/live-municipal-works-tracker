@@ -6,6 +6,7 @@ import com.municipal.tracker.repository.ComplaintRepository;
 import com.municipal.tracker.repository.ProjectRepository;
 import com.municipal.tracker.service.PriorityCalculationService;
 import com.municipal.tracker.service.PriorityFactorCalculator;
+import com.municipal.tracker.service.ProjectAccessService;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.springframework.web.server.ResponseStatusException;
@@ -17,19 +18,19 @@ import java.util.Optional;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
-import static org.mockito.Mockito.mock;
-import static org.mockito.Mockito.when;
+import static org.mockito.Mockito.*;
 
 class PriorityCalculationServiceTest {
     private final ProjectRepository projects = mock(ProjectRepository.class);
     private final ComplaintRepository complaints = mock(ComplaintRepository.class);
+    private final ProjectAccessService access = mock(ProjectAccessService.class);
     private PriorityCalculationService service;
 
     @BeforeEach
     void setUp() {
         PriorityProperties properties = new PriorityProperties();
         service = new PriorityCalculationService(projects, complaints,
-                new PriorityFactorCalculator(properties), properties);
+                new PriorityFactorCalculator(properties), properties, access);
     }
 
     @Test
@@ -95,7 +96,20 @@ class PriorityCalculationServiceTest {
     }
 
     @Test
+    void actorCalculationChecksProjectAccess() {
+        MunicipalProject project = project(12L);
+        User actor = new User();
+        when(projects.findById(12L)).thenReturn(Optional.of(project));
+        when(complaints.findByMunicipalProjectId(12L)).thenReturn(List.of());
+
+        service.calculateForActor(12L, actor);
+
+        verify(access).requireProjectWardAccess(actor, project);
+    }
+
+    @Test
     void classifiesEveryConfiguredThresholdBoundary() {
+        assertThat(service.classifyScore(-1.0)).isEqualTo(ProjectPriorityLevel.LOW);
         assertThat(service.classifyScore(0.0)).isEqualTo(ProjectPriorityLevel.LOW);
         assertThat(service.classifyScore(29.99)).isEqualTo(ProjectPriorityLevel.LOW);
         assertThat(service.classifyScore(30.0)).isEqualTo(ProjectPriorityLevel.MEDIUM);
@@ -104,6 +118,24 @@ class PriorityCalculationServiceTest {
         assertThat(service.classifyScore(74.99)).isEqualTo(ProjectPriorityLevel.HIGH);
         assertThat(service.classifyScore(75.0)).isEqualTo(ProjectPriorityLevel.CRITICAL);
         assertThat(service.classifyScore(100.0)).isEqualTo(ProjectPriorityLevel.CRITICAL);
+        assertThat(service.classifyScore(125.0)).isEqualTo(ProjectPriorityLevel.CRITICAL);
+    }
+
+    @Test
+    void keepsConfiguredWeightsAndFactorOrderWhenSomeFactorsAreUnavailable() {
+        MunicipalProject project = project(13L);
+
+        PriorityCalculationService.Calculation result = service.calculate(
+                project, List.of(), LocalDate.of(2026, 9, 27), LocalDateTime.of(2026, 9, 27, 12, 0));
+
+        assertThat(result.factors())
+                .extracting(PriorityCalculationService.FactorContribution::name)
+                .containsExactly("SEVERITY", "COMPLAINT_VOLUME", "IMPACT", "DEADLINE_RISK", "PROGRESS_GAP");
+        assertThat(result.factors())
+                .extracting(PriorityCalculationService.FactorContribution::weight)
+                .containsExactly(0.30, 0.20, 0.20, 0.15, 0.15);
+        assertThat(result.factors()).filteredOn(factor -> !factor.available())
+                .allSatisfy(factor -> assertThat(factor.weightedContribution()).isZero());
     }
 
     private MunicipalProject project(Long id) {

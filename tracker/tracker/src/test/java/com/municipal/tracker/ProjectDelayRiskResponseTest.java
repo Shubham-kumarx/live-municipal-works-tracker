@@ -31,6 +31,8 @@ class ProjectDelayRiskResponseTest {
 
         assertThat(response.available()).isFalse();
         assertThat(response.delayRisk()).isNull();
+        assertThat(response.actualProgress()).isEqualTo(20.0);
         assertThat(response.progressGap()).isNull();
+        assertThat(response.reason()).isEqualTo("Expected end date is missing");
     }
 }

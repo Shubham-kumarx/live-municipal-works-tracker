@@ -6,7 +6,8 @@ import jakarta.servlet.FilterChain;
 import jakarta.servlet.ServletException;
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.servlet.http.HttpServletResponse;
-import lombok.RequiredArgsConstructor;
+import org.springframework.beans.factory.annotation.Value;
+import jakarta.servlet.http.Cookie;
 import org.springframework.security.authentication.UsernamePasswordAuthenticationToken;
 import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.security.web.authentication.WebAuthenticationDetailsSource;
@@ -15,11 +16,18 @@ import org.springframework.web.filter.OncePerRequestFilter;
 import java.io.IOException;
 
 @Component
-@RequiredArgsConstructor
 public class JwtFilter extends OncePerRequestFilter {
 
     private final JwtUtil jwtUtil;
     private final UserRepository userRepository;
+    private final String cookieName;
+
+    public JwtFilter(JwtUtil jwtUtil, UserRepository userRepository,
+            @Value("${app.security.cookie.name:municipal_auth}") String cookieName) {
+        this.jwtUtil = jwtUtil;
+        this.userRepository = userRepository;
+        this.cookieName = cookieName;
+    }
 
     @Override
     protected void doFilterInternal(
@@ -29,16 +37,11 @@ public class JwtFilter extends OncePerRequestFilter {
     ) throws ServletException, IOException {
 
         // Step 1 - Get Authorization header
-        final String authHeader = request.getHeader("Authorization");
-
-        // Step 2 - If no header or doesn't start with "Bearer ", skip filter
-        if (authHeader == null || !authHeader.startsWith("Bearer ")) {
+        final String token = resolveToken(request);
+        if (token == null) {
             filterChain.doFilter(request, response);
             return;
         }
-
-        // Step 3 - Extract the token (remove "Bearer " prefix)
-        final String token = authHeader.substring(7);
 
         // Step 4 - Extract email from token
         final String email;
@@ -79,5 +82,20 @@ public class JwtFilter extends OncePerRequestFilter {
 
         // Step 10 - Continue to next filter / controller
         filterChain.doFilter(request, response);
+    }
+
+    private String resolveToken(HttpServletRequest request) {
+        String authHeader = request.getHeader("Authorization");
+        if (authHeader != null && authHeader.startsWith("Bearer ")) {
+            return authHeader.substring(7);
+        }
+        Cookie[] cookies = request.getCookies();
+        if (cookies == null) return null;
+        for (Cookie cookie : cookies) {
+            if (cookieName.equals(cookie.getName()) && !cookie.getValue().isBlank()) {
+                return cookie.getValue();
+            }
+        }
+        return null;
     }
 }

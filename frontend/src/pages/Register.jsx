@@ -1,7 +1,8 @@
 import { useCallback, useEffect, useState } from 'react'
 import { useNavigate, Link } from 'react-router-dom'
 import api from '../api/axios'
-import { landingPath } from '../auth/session'
+import { apiErrorMessage } from '../api/errors'
+import { landingPath, setSessionUser } from '../auth/session'
 function distanceKm(lat1, lng1, lat2, lng2) {
   const R = 6371
   const dLat = (lat2 - lat1) * Math.PI / 180
@@ -102,16 +103,10 @@ function detectNearestWard() {
         ...form, fullName, email, phone,
         wardId: Number(form.wardId),
       })
-      localStorage.setItem('token', res.data.token)
-      localStorage.setItem('user', JSON.stringify({
-        email: res.data.email,
-        fullName: res.data.fullName,
-        role: res.data.role,
-        wardId: res.data.wardId,
-      }))
+      setSessionUser(res.data)
       navigate(landingPath(res.data.role))
     } catch (err) {
-      setError(err.response?.data?.message || 'Registration failed. Try again.')
+      setError(apiErrorMessage(err, 'Registration failed. Try again.'))
     } finally {
       setLoading(false)
     }
@@ -149,7 +144,7 @@ function detectNearestWard() {
             Create citizen account
           </h1>
           <p style={{ fontSize: 13, color: '#8A8F98' }}>
-            Free for residents · North Delhi Municipal Corporation
+            Register to report issues and monitor municipal work
           </p>
         </div>
 

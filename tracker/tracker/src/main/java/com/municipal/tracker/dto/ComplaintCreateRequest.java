@@ -39,4 +39,17 @@ public record ComplaintCreateRequest(
 
         @NotNull(message = "Prediction confirmation state is required")
         ComplaintPredictionState predictionState
-) { }
+) {
+    private static final String SUPPORTED_TYPES =
+            "DOMESTIC_TRASH, ILLEGAL_PARKING, DAMAGED_SIGN, or POTHOLE";
+
+    @AssertTrue(message = "AI predicted issue type must be " + SUPPORTED_TYPES)
+    public boolean isAiPredictedIssueTypeSupported() {
+        return aiPredictedIssueType == null || aiPredictedIssueType.isSupportedClassification();
+    }
+
+    @AssertTrue(message = "Final issue type must be " + SUPPORTED_TYPES)
+    public boolean isFinalIssueTypeSupported() {
+        return finalIssueType == null || finalIssueType.isSupportedClassification();
+    }
+}

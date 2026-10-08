@@ -1,0 +1,114 @@
+{
+  "assignmentDigest": "d7d7670e5aaa96466b168056767068f0cd3de85b4f9050d60899673b8e193435",
+  "crossClassConflicts": {
+    "exactHashPairs": 0,
+    "perceptualPairs": 0,
+    "sourceKeyPairs": 0
+  },
+  "datasetRoot": "archive",
+  "duplicateGroupCount": 1543,
+  "duplicateSignals": {
+    "exactPairs": 1212,
+    "perceptualNonExactPairs": 1675,
+    "sourceLineagePairs": 23015
+  },
+  "excludedDuplicateOrVariantCount": 4532,
+  "excludedSourceFolders": [
+    "Infrastructure_Damage_Concrete",
+    "Vandalism_Graffiti"
+  ],
+  "inventoryImageCount": 6075,
+  "inventorySha256": "a159ed5132d22e541b0b0730e63055fa0483488c6da9309733f0121954794c9d",
+  "largestGroup": {
+    "groupId": "pothole-46bf59878cb8ccf1",
+    "label": "POTHOLE",
+    "size": 82,
+    "sourceKeys": [
+      "youtube-29_jpg"
+    ]
+  },
+  "manifestSha256": "30b60f5d65e489aae154d4afd1b4a30da36028350e07bdcbf7c2d34bc0f21f3f",
+  "preparationStatus": "READY_FOR_FOUR_CLASS_TRAINING",
+  "representativeCountByClass": {
+    "DAMAGED_SIGN": 465,
+    "DOMESTIC_TRASH": 247,
+    "ILLEGAL_PARKING": 638,
+    "POTHOLE": 193
+  },
+  "representativeCountByClassAndSplit": {
+    "DAMAGED_SIGN": {
+      "test": 70,
+      "train": 325,
+      "validation": 70
+    },
+    "DOMESTIC_TRASH": {
+      "test": 37,
+      "train": 173,
+      "validation": 37
+    },
+    "ILLEGAL_PARKING": {
+      "test": 96,
+      "train": 446,
+      "validation": 96
+    },
+    "POTHOLE": {
+      "test": 29,
+      "train": 135,
+      "validation": 29
+    }
+  },
+  "representativeImageCount": 1543,
+  "schemaVersion": 1,
+  "sourceCounts": {
+    "test": {
+      "Domestic_trash": 195,
+      "Infrastructure_Damage_Concrete": 215,
+      "Parking_Issues_Illegal_Parking": 232,
+      "Road_Issues_Damaged_Sign": 241,
+      "Road_Issues_Pothole": 199,
+      "Vandalism_Graffiti": 221
+    },
+    "train": {
+      "Domestic_trash": 486,
+      "Infrastructure_Damage_Concrete": 823,
+      "Parking_Issues_Illegal_Parking": 1284,
+      "Road_Issues_Damaged_Sign": 1927,
+      "Road_Issues_Pothole": 646,
+      "Vandalism_Graffiti": 1232
+    },
+    "validate": {
+      "Domestic_trash": 195,
+      "Infrastructure_Damage_Concrete": 216,
+      "Parking_Issues_Illegal_Parking": 223,
+      "Road_Issues_Damaged_Sign": 241,
+      "Road_Issues_Pothole": 206,
+      "Vandalism_Graffiti": 220
+    }
+  },
+  "splitRatios": {
+    "test": 0.15,
+    "train": 0.7,
+    "validation": 0.15
+  },
+  "splitSeed": 2026,
+  "supportedLabels": [
+    "DOMESTIC_TRASH",
+    "ILLEGAL_PARKING",
+    "DAMAGED_SIGN",
+    "POTHOLE"
+  ],
+  "trainingClassImbalanceRatio": 3.303704,
+  "uniqueSha256Count": 5016,
+  "validation": {
+    "artifactDigestValidation": "PASS",
+    "classSplitCoverage": "PASS",
+    "crossClassConflictCount": 0,
+    "decodedImageCount": 6075,
+    "exactHashLeakageCount": 0,
+    "groupLeakageCount": 0,
+    "manifestRowCount": 1543,
+    "perceptualLeakageCount": 0,
+    "perceptualPairsChecked": 2887,
+    "sourceKeyLeakageCount": 0
+  }
+}

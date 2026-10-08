@@ -8,11 +8,12 @@ import com.municipal.tracker.dto.ProjectCreateRequest;
 import com.municipal.tracker.dto.ProjectImpactUpdateRequest;
 import com.municipal.tracker.dto.ProjectPriorityResponse;
 import com.municipal.tracker.dto.ProjectDelayRiskResponse;
+import com.municipal.tracker.dto.WardProjectStatsResponse;
+import com.municipal.tracker.exception.ResourceNotFoundException;
 import jakarta.validation.Valid;
 import com.municipal.tracker.model.ProjectStatus;
 import com.municipal.tracker.model.User;
 import com.municipal.tracker.service.ProjectService;
-import com.municipal.tracker.service.ProjectAccessService;
 import com.municipal.tracker.service.PriorityCalculationService;
 import com.municipal.tracker.service.DelayRiskService;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -22,7 +23,6 @@ import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.security.core.annotation.AuthenticationPrincipal;
 import org.springframework.web.bind.annotation.*;
 import java.util.List;
-import java.util.Map;
 
 @RestController
 @RequestMapping("/api/projects")
@@ -30,24 +30,15 @@ public class ProjectController {
 
     private final ProjectService projectService;
     private final PriorityCalculationService priorityCalculationService;
-    private final ProjectAccessService projectAccessService;
     private final DelayRiskService delayRiskService;
 
     @Autowired
     public ProjectController(ProjectService projectService,
                              PriorityCalculationService priorityCalculationService,
-                             ProjectAccessService projectAccessService,
                              DelayRiskService delayRiskService) {
         this.projectService = projectService;
         this.priorityCalculationService = priorityCalculationService;
-        this.projectAccessService = projectAccessService;
         this.delayRiskService = delayRiskService;
-    }
-
-    public ProjectController(ProjectService projectService,
-                             PriorityCalculationService priorityCalculationService,
-                             ProjectAccessService projectAccessService) {
-        this(projectService, priorityCalculationService, projectAccessService, null);
     }
 
     // ── GET all projects in a ward (public - for map)
@@ -65,15 +56,15 @@ public class ProjectController {
     @GetMapping("/{id}")
     public ResponseEntity<ProjectResponse> getProjectById(
             @PathVariable Long id) {
-        return projectService.getProjectById(id)
-                .map(ProjectResponse::from).map(ResponseEntity::ok)
-                .orElse(ResponseEntity.notFound().build());
+        MunicipalProject project = projectService.getProjectById(id)
+                .orElseThrow(() -> new ResourceNotFoundException("Project", id));
+        return ResponseEntity.ok(ProjectResponse.from(project));
     }
 
     // ── GET ward dashboard stats
     // GET http://localhost:8080/api/projects/ward/2/stats
     @GetMapping("/ward/{wardId}/stats")
-    public ResponseEntity<Map<String, Object>> getWardStats(
+    public ResponseEntity<WardProjectStatsResponse> getWardStats(
             @PathVariable Long wardId) {
         return ResponseEntity.ok(
                 projectService.getWardStats(wardId)
@@ -146,9 +137,11 @@ public class ProjectController {
     // ── FLAG a project (any logged-in citizen)
     // PATCH http://localhost:8080/api/projects/1/flag
     @PatchMapping("/{id}/flag")
+    @PreAuthorize("hasRole('CITIZEN')")
     public ResponseEntity<ProjectResponse> flagProject(
-            @PathVariable Long id) {
-        return ResponseEntity.ok(ProjectResponse.from(projectService.flagProject(id)));
+            @PathVariable Long id,
+            @AuthenticationPrincipal User currentUser) {
+        return ResponseEntity.ok(ProjectResponse.from(projectService.flagProject(id, currentUser)));
     }
 
     // ── UPDATE budget spent (Officer/Admin only)
@@ -178,8 +171,8 @@ public class ProjectController {
     public ResponseEntity<ProjectPriorityResponse> getPriority(
             @PathVariable Long id,
             @AuthenticationPrincipal User currentUser) {
-        PriorityCalculationService.Calculation calculation = priorityCalculationService.calculate(id);
-        projectAccessService.requireProjectWardAccess(currentUser, calculation.project());
+        PriorityCalculationService.Calculation calculation =
+                priorityCalculationService.calculateForActor(id, currentUser);
         return ResponseEntity.ok(ProjectPriorityResponse.from(calculation));
     }
 
@@ -188,8 +181,7 @@ public class ProjectController {
     public ResponseEntity<ProjectDelayRiskResponse> getDelayRisk(
             @PathVariable Long id,
             @AuthenticationPrincipal User currentUser) {
-        DelayRiskService.Calculation calculation = delayRiskService.calculate(id);
-        projectAccessService.requireProjectWardAccess(currentUser, calculation.project());
+        DelayRiskService.Calculation calculation = delayRiskService.calculateForActor(id, currentUser);
         return ResponseEntity.ok(ProjectDelayRiskResponse.from(calculation));
     }
 }

@@ -8,6 +8,7 @@ import lombok.RequiredArgsConstructor;
 import org.springframework.web.socket.config.annotation.EnableWebSocketMessageBroker;
 import org.springframework.web.socket.config.annotation.StompEndpointRegistry;
 import org.springframework.web.socket.config.annotation.WebSocketMessageBrokerConfigurer;
+import java.util.Arrays;
 
 @Configuration
 @EnableWebSocketMessageBroker
@@ -37,7 +38,16 @@ public class WebSocketConfig implements WebSocketMessageBrokerConfigurer {
     public void registerStompEndpoints(StompEndpointRegistry registry) {
         // The URL React connects to for WebSocket
         registry.addEndpoint("/ws")
-                .setAllowedOrigins(allowedOrigins.split(","))
+                .setAllowedOrigins(parseAllowedOrigins())
                 .withSockJS();
+    }
+
+    private String[] parseAllowedOrigins() {
+        String[] origins = Arrays.stream(allowedOrigins.split(","))
+                .map(String::trim).filter(origin -> !origin.isBlank()).toArray(String[]::new);
+        if (origins.length == 0 || Arrays.asList(origins).contains("*")) {
+            throw new IllegalStateException("WebSocket origins must be explicit");
+        }
+        return origins;
     }
 }

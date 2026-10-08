@@ -6,15 +6,19 @@ import com.municipal.tracker.dto.LoginRequest;
 import com.municipal.tracker.dto.RegisterRequest;
 import com.municipal.tracker.model.User;
 import com.municipal.tracker.model.Ward;
+import com.municipal.tracker.model.Role;
 import com.municipal.tracker.repository.UserRepository;
 import com.municipal.tracker.repository.WardRepository;
 import lombok.RequiredArgsConstructor;
 import org.springframework.security.authentication.AuthenticationManager;
+import org.springframework.security.authentication.BadCredentialsException;
+import org.springframework.security.core.AuthenticationException;
 import org.springframework.security.authentication.UsernamePasswordAuthenticationToken;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Service;
 import org.springframework.security.access.AccessDeniedException;
 import org.springframework.web.server.ResponseStatusException;
+import org.springframework.transaction.annotation.Transactional;
 import static org.springframework.http.HttpStatus.CONFLICT;
 import static org.springframework.http.HttpStatus.NOT_FOUND;
 
@@ -27,8 +31,10 @@ public class AuthService {
     private final PasswordEncoder passwordEncoder;
     private final JwtUtil jwtUtil;
     private final AuthenticationManager authenticationManager;
+    private final LoginAttemptService loginAttemptService;
 
     // ── REGISTER ──────────────────────────────────
+    @Transactional
     public AuthResponse register(RegisterRequest request) {
 
         // Check if email already exists
@@ -71,9 +77,14 @@ public class AuthService {
         );
     }
 
+    @Transactional
     public AuthResponse registerStaff(RegisterRequest request, User actor) {
         if (actor == null) throw new AccessDeniedException("Authentication required");
-        if (actor.getRole() == com.municipal.tracker.model.Role.WARD_OFFICER) {
+        if (request.getRole() != Role.FIELD_WORKER && request.getRole() != Role.WARD_OFFICER) {
+            throw new IllegalArgumentException(
+                    "This endpoint can only create FIELD_WORKER or WARD_OFFICER accounts");
+        }
+        if (actor.getRole() == Role.WARD_OFFICER) {
             if (actor.getWard() == null || request.getWardId() == null
                     || !actor.getWard().getId().equals(request.getWardId())) {
                 throw new AccessDeniedException("Ward officers can create staff only in their ward");
@@ -83,20 +94,24 @@ public class AuthService {
     }
 
     // ── LOGIN ──────────────────────────────────────
-    public AuthResponse login(LoginRequest request) {
+    @Transactional(readOnly = true)
+    public AuthResponse login(LoginRequest request, String remoteAddress) {
 
-        // This line checks email + password automatically
-        // Throws exception if credentials are wrong
-        authenticationManager.authenticate(
-                new UsernamePasswordAuthenticationToken(
-                        request.getEmail(),
-                        request.getPassword()
-                )
-        );
+        loginAttemptService.checkAllowed(request.getEmail(), remoteAddress);
+
+        try {
+            authenticationManager.authenticate(
+                    new UsernamePasswordAuthenticationToken(
+                            request.getEmail(), request.getPassword()));
+        } catch (AuthenticationException exception) {
+            loginAttemptService.recordFailure(request.getEmail(), remoteAddress);
+            throw new BadCredentialsException("Invalid email or password");
+        }
+        loginAttemptService.recordSuccess(request.getEmail(), remoteAddress);
 
         // If we reach here — credentials are correct
         User user = userRepository.findByEmail(request.getEmail())
-                .orElseThrow(() -> new IllegalArgumentException("User not found"));
+                .orElseThrow(() -> new BadCredentialsException("Invalid email or password"));
 
         // Generate JWT token
         String token = jwtUtil.generateToken(user);

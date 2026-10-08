@@ -11,6 +11,7 @@ import java.util.List;
 import java.time.LocalDate;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
 class PriorityFactorCalculatorTest {
     private PriorityFactorCalculator calculator;
@@ -117,6 +118,22 @@ class PriorityFactorCalculatorTest {
                 .normalizedScore()).isEqualTo(0.0);
         assertThat(calculator.expectedProgress(ProjectStatus.IN_PROGRESS, day, day, day)
                 .normalizedScore()).isEqualTo(100.0);
+    }
+
+    @Test
+    void handlesExactTimelineBoundariesAndCancelledProjects() {
+        LocalDate start = LocalDate.of(2026, 9, 1);
+        LocalDate end = LocalDate.of(2026, 9, 21);
+
+        assertThat(calculator.expectedProgress(ProjectStatus.IN_PROGRESS, start, end, start)
+                .normalizedScore()).isZero();
+        assertThat(calculator.expectedProgress(ProjectStatus.IN_PROGRESS, start, end, end)
+                .normalizedScore()).isEqualTo(100.0);
+        assertThat(calculator.expectedProgress(ProjectStatus.CANCELLED, start, end, start.plusDays(10))
+                .normalizedScore()).isEqualTo(50.0);
+        assertThatThrownBy(() -> calculator.expectedProgress(ProjectStatus.IN_PROGRESS, start, end, null))
+                .isInstanceOf(IllegalArgumentException.class)
+                .hasMessageContaining("Calculation date");
     }
 
     @Test

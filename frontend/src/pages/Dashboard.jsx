@@ -1,5 +1,7 @@
 import { useCallback, useEffect, useState } from 'react'
 import api from '../api/axios'
+import { apiErrorMessage } from '../api/errors'
+import { COMPLAINT_ISSUE_TYPES, complaintIssueTypeLabel } from '../constants/complaintIssueTypes'
 
 function Kpi({ value, label, detail, tone }) {
   return (
@@ -52,8 +54,8 @@ function WorkDecisionTable({ title, works, emptyMessage, showRisk = false }) {
           <table className="data-table">
             <thead>
               <tr>
-                <th>Work</th><th>Location</th><th>Priority</th>
-                {showRisk && <th>Delay risk</th>}
+                <th>Work</th><th>Location</th><th>Weighted priority</th>
+                {showRisk && <th>Rule-based delay risk</th>}
                 <th>Deadline</th><th>Progress</th>
               </tr>
             </thead>
@@ -120,7 +122,7 @@ export default function Dashboard() {
       setDashboard(response.data)
     } catch (requestError) {
       setDashboard(null)
-      setError(requestError.response?.data?.message || 'Dashboard data could not be loaded.')
+      setError(apiErrorMessage(requestError, 'Dashboard data could not be loaded.'))
     } finally {
       setLoading(false)
     }
@@ -186,6 +188,10 @@ export default function Dashboard() {
     .toSorted((a, b) => filters.complaintSort === 'severity'
       ? severityRank[b.severity] - severityRank[a.severity]
       : new Date(b.createdAt) - new Date(a.createdAt))
+  const issueTypeOptions = [...new Set([
+    ...COMPLAINT_ISSUE_TYPES,
+    ...dashboard.recentComplaints.map(complaint => complaint.issueType).filter(Boolean),
+  ])]
   const highPriorityWorks = filteredWorks
     .filter(work => ['HIGH', 'CRITICAL'].includes(work.priorityLevel))
     .toSorted((a, b) => b.priorityScore - a.priorityScore)
@@ -215,11 +221,11 @@ export default function Dashboard() {
         <Kpi value={workMetrics.active} label="Active" detail="currently in progress" tone="blue" />
         <Kpi value={workMetrics.completed} label="Completed" detail="completed work" tone="green" />
         <Kpi value={workMetrics.delayed} label="Delayed" detail="marked delayed" tone="red" />
-        <Kpi value={workMetrics.highPriority} label="High priority" detail="high or critical score" tone="red" />
-        <Kpi value={workMetrics.highDelayRisk} label="High delay risk" detail="rule-based assessment" tone="red" />
+        <Kpi value={workMetrics.highPriority} label="High priority" detail="explainable weighted score" tone="red" />
+        <Kpi value={workMetrics.highDelayRisk} label="High delay risk" detail="threshold-based assessment" tone="red" />
         <Kpi value={complaintMetrics.total} label="Complaints" detail="all complaints" tone="blue" />
         <Kpi value={complaintMetrics.unresolved} label="Unresolved" detail="awaiting resolution" tone="amber" />
-        <Kpi value={complaintMetrics.aiAssisted} label="AI assisted" detail="included an AI prediction" tone="green" />
+        <Kpi value={complaintMetrics.aiAssisted} label="AI-assisted" detail="included a reviewable AI suggestion" tone="green" />
       </div>
 
       <div className="panel dashboard-filter-panel">
@@ -228,10 +234,10 @@ export default function Dashboard() {
           <button className="btn btn-ghost btn-sm" onClick={resetFilters}>Reset</button>
         </div>
         <div className="dashboard-filter-grid">
-          <label><span className="t-label">Priority</span><select className="input" name="priority" value={filters.priority} onChange={updateFilter}>
+          <label><span className="t-label">Weighted priority</span><select className="input" name="priority" value={filters.priority} onChange={updateFilter}>
             <option value="">All priorities</option><option>CRITICAL</option><option>HIGH</option><option>MEDIUM</option><option>LOW</option>
           </select></label>
-          <label><span className="t-label">Delay risk</span><select className="input" name="delayRisk" value={filters.delayRisk} onChange={updateFilter}>
+          <label><span className="t-label">Rule-based delay risk</span><select className="input" name="delayRisk" value={filters.delayRisk} onChange={updateFilter}>
             <option value="">All risk levels</option><option>HIGH_DELAY_RISK</option><option>AT_RISK</option><option>ON_TRACK</option><option>UNAVAILABLE</option>
           </select></label>
           <label><span className="t-label">Work status</span><select className="input" name="status" value={filters.status} onChange={updateFilter}>
@@ -241,7 +247,10 @@ export default function Dashboard() {
             <option value="">All severities</option><option>CRITICAL</option><option>HIGH</option><option>MEDIUM</option><option>LOW</option>
           </select></label>
           <label><span className="t-label">Issue type</span><select className="input" name="issueType" value={filters.issueType} onChange={updateFilter}>
-            <option value="">All issue types</option><option>POTHOLE</option><option>ROAD_CRACK</option><option>GARBAGE_ACCUMULATION</option><option>WATERLOGGING</option><option>DAMAGED_STREETLIGHT</option><option>OPEN_MANHOLE</option><option>OTHER</option>
+            <option value="">All issue types</option>
+            {issueTypeOptions.map(type => (
+              <option key={type} value={type}>{complaintIssueTypeLabel(type)}</option>
+            ))}
           </select></label>
           <label><span className="t-label">Deadline</span><select className="input" name="deadline" value={filters.deadline} onChange={updateFilter}>
             <option value="">All deadlines</option><option value="OVERDUE">Overdue</option><option value="7_DAYS">Due within 7 days</option><option value="30_DAYS">Due within 30 days</option><option value="NONE">No deadline</option>
@@ -285,7 +294,7 @@ export default function Dashboard() {
                 </div>
                 <div className="dashboard-complaint-badges">
                   {decisionBadge(complaint.severity)}
-                  <span className="badge badge-sanc">{formatEnum(complaint.issueType)}</span>
+                  <span className="badge badge-sanc">{complaintIssueTypeLabel(complaint.issueType)}</span>
                   {complaint.aiAssisted && <span className="badge badge-ip">AI assisted</span>}
                 </div>
               </article>

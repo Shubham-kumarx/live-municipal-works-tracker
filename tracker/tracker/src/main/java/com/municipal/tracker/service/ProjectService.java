@@ -1,13 +1,18 @@
 package com.municipal.tracker.service;
 
+import com.municipal.tracker.dto.WardProjectStatsResponse;
 import com.municipal.tracker.model.*;
 import com.municipal.tracker.repository.ProjectRepository;
 import com.municipal.tracker.repository.UserRepository;
 import com.municipal.tracker.repository.WardRepository;
+import com.municipal.tracker.repository.ProjectFlagRepository;
+import jakarta.persistence.EntityManager;
+import jakarta.persistence.LockModeType;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.messaging.simp.SimpMessagingTemplate;
 import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Transactional;
 import java.time.LocalDateTime;
 import java.util.HashMap;
 import java.util.List;
@@ -27,8 +32,11 @@ public class ProjectService {
     private final UserRepository userRepository;
     private final SimpMessagingTemplate messagingTemplate;
     private final ProjectAccessService projectAccessService;
+    private final ProjectFlagRepository projectFlagRepository;
+    private final EntityManager entityManager;
 
     // ── CREATE ──────────────────────────────────
+    @Transactional
     public MunicipalProject createProject(
             MunicipalProject project,
             Long wardId,
@@ -66,26 +74,41 @@ public class ProjectService {
     }
 
     // ── GET ALL BY WARD ─────────────────────────
+    @Transactional(readOnly = true)
     public List<MunicipalProject> getProjectsByWard(Long wardId) {
-        return projectRepository.findAllByWardForMap(wardId);
+        return initializeResponseCollections(projectRepository.findAllByWardForMap(wardId));
     }
 
     // ── GET BY ID ───────────────────────────────
+    @Transactional(readOnly = true)
     public Optional<MunicipalProject> getProjectById(Long id) {
-        return projectRepository.findById(id);
+        return projectRepository.findById(id).map(this::initializeResponseCollections);
     }
 
     // ── GET BY WORKER ───────────────────────────
+    @Transactional(readOnly = true)
     public List<MunicipalProject> getProjectsByWorker(Long workerId) {
-        return projectRepository.findByAssignedWorkerId(workerId);
+        return initializeResponseCollections(projectRepository.findByAssignedWorkerId(workerId));
     }
 
     // ── GET FLAGGED ─────────────────────────────
+    @Transactional(readOnly = true)
     public List<MunicipalProject> getFlaggedProjects(Long wardId) {
-        return projectRepository.findByWardIdAndFlaggedTrue(wardId);
+        return initializeResponseCollections(projectRepository.findByWardIdAndFlaggedTrue(wardId));
+    }
+
+    private List<MunicipalProject> initializeResponseCollections(List<MunicipalProject> projects) {
+        projects.forEach(this::initializeResponseCollections);
+        return projects;
+    }
+
+    private MunicipalProject initializeResponseCollections(MunicipalProject project) {
+        project.getPhotoUrls().size();
+        return project;
     }
 
     // ── UPDATE STATUS ───────────────────────────
+    @Transactional
     public MunicipalProject updateStatus(
             Long projectId,
             ProjectStatus newStatus,
@@ -148,6 +171,7 @@ public class ProjectService {
     }
 
     // ── ASSIGN WORKER ───────────────────────────
+    @Transactional
     public MunicipalProject assignWorker(Long projectId, Long workerId, User actor) {
 
         MunicipalProject project = projectRepository.findById(projectId)
@@ -181,11 +205,26 @@ public class ProjectService {
     }
 
     // ── FLAG PROJECT ─────────────────────────────
-    public MunicipalProject flagProject(Long projectId) {
+    @Transactional
+    public MunicipalProject flagProject(Long projectId, User actor) {
+        if (actor == null || actor.getRole() != Role.CITIZEN) {
+            throw new org.springframework.security.access.AccessDeniedException(
+                    "Only citizens can flag projects");
+        }
 
         MunicipalProject project = projectRepository.findById(projectId)
                 .orElseThrow(() -> new ResponseStatusException(NOT_FOUND,
                         "Project not found: " + projectId));
+
+        entityManager.lock(project, LockModeType.PESSIMISTIC_WRITE);
+        if (projectFlagRepository.existsByProjectIdAndCitizenId(projectId, actor.getId())) {
+            return project;
+        }
+
+        ProjectFlag flag = new ProjectFlag();
+        flag.setProject(project);
+        flag.setCitizen(actor);
+        projectFlagRepository.save(flag);
 
         project.setFlagged(true);
         project.setFlagCount(project.getFlagCount() + 1);
@@ -198,6 +237,7 @@ public class ProjectService {
     }
 
     // ── UPDATE BUDGET SPENT ──────────────────────
+    @Transactional
     public MunicipalProject updateBudgetSpent(
             Long projectId, Double amountSpent, User actor) {
 
@@ -217,6 +257,7 @@ public class ProjectService {
         return updated;
     }
 
+    @Transactional
     public MunicipalProject updateImpactLevel(Long projectId, ProjectImpactLevel impactLevel, User actor) {
         MunicipalProject project = projectRepository.findById(projectId)
                 .orElseThrow(() -> new ResponseStatusException(NOT_FOUND,
@@ -238,29 +279,16 @@ public class ProjectService {
     }
 
     // ── WARD DASHBOARD STATS ─────────────────────
-    public Map<String, Object> getWardStats(Long wardId) {
-        Map<String, Object> stats = new HashMap<>();
-
-        stats.put("totalProjects",
-                projectRepository.countByWardId(wardId));
-        stats.put("sanctioned",
-                projectRepository.countByWardIdAndStatus(
-                        wardId, ProjectStatus.SANCTIONED));
-        stats.put("inProgress",
-                projectRepository.countByWardIdAndStatus(
-                        wardId, ProjectStatus.IN_PROGRESS));
-        stats.put("completed",
-                projectRepository.countByWardIdAndStatus(
-                        wardId, ProjectStatus.COMPLETED));
-        stats.put("delayed",
-                projectRepository.countByWardIdAndStatus(
-                        wardId, ProjectStatus.DELAYED));
-        stats.put("totalBudgetAllocated",
-                Optional.ofNullable(projectRepository.getTotalBudgetAllocatedByWard(wardId)).orElse(0.0));
-        stats.put("totalBudgetSpent",
+    @Transactional(readOnly = true)
+    public WardProjectStatsResponse getWardStats(Long wardId) {
+        return new WardProjectStatsResponse(
+                projectRepository.countByWardId(wardId),
+                projectRepository.countByWardIdAndStatus(wardId, ProjectStatus.SANCTIONED),
+                projectRepository.countByWardIdAndStatus(wardId, ProjectStatus.IN_PROGRESS),
+                projectRepository.countByWardIdAndStatus(wardId, ProjectStatus.COMPLETED),
+                projectRepository.countByWardIdAndStatus(wardId, ProjectStatus.DELAYED),
+                Optional.ofNullable(projectRepository.getTotalBudgetAllocatedByWard(wardId)).orElse(0.0),
                 Optional.ofNullable(projectRepository.getTotalBudgetSpentByWard(wardId)).orElse(0.0));
-
-        return stats;
     }
 
     // ── WEBSOCKET BROADCAST ──────────────────────

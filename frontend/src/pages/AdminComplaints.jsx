@@ -1,5 +1,8 @@
 import { useCallback, useEffect, useState } from 'react'
+import { Link } from 'react-router-dom'
 import api from '../api/axios'
+import { apiErrorMessage } from '../api/errors'
+import { complaintIssueTypeLabel } from '../constants/complaintIssueTypes'
 
 const label = value => value?.replaceAll('_', ' ').toLowerCase().replace(/^./, c => c.toUpperCase())
 
@@ -15,6 +18,7 @@ export default function AdminComplaints() {
   const loadData = useCallback(async () => {
     setLoading(true)
     setError('')
+    setSuccess('')
     try {
       const [complaintResponse, projectResponse] = await Promise.all([
         api.get('/api/complaints'),
@@ -23,7 +27,7 @@ export default function AdminComplaints() {
       setComplaints(complaintResponse.data)
       setProjects(projectResponse.data)
     } catch (requestError) {
-      setError(requestError.response?.data?.message || 'Complaints could not be loaded.')
+      setError(apiErrorMessage(requestError, 'Complaints could not be loaded.'))
     } finally {
       setLoading(false)
     }
@@ -43,7 +47,7 @@ export default function AdminComplaints() {
       await loadData()
       setSuccess(`Complaint #${complaintId} was linked successfully.`)
     } catch (requestError) {
-      setError(requestError.response?.data?.message || 'Complaint could not be linked.')
+      setError(apiErrorMessage(requestError, 'Complaint could not be linked.'))
     } finally {
       setBusyId(null)
     }
@@ -56,7 +60,7 @@ export default function AdminComplaints() {
       await loadData()
       setSuccess(`Complaint #${complaintId} was unlinked successfully.`)
     } catch (requestError) {
-      setError(requestError.response?.data?.message || 'Complaint could not be unlinked.')
+      setError(apiErrorMessage(requestError, 'Complaint could not be unlinked.'))
     } finally {
       setBusyId(null)
     }
@@ -72,11 +76,12 @@ export default function AdminComplaints() {
         <button className="btn btn-sm" onClick={loadData} disabled={loading}>Refresh</button>
       </div>
 
-      {error && <div className="complaint-message complaint-error" role="alert">
-        {error} <button className="btn btn-ghost btn-sm" onClick={loadData}>Retry</button>
-      </div>}
       {success && <div className="complaint-message complaint-success" role="status">{success}</div>}
-      {loading ? (
+      {error ? (
+        <div className="complaint-message complaint-error" role="alert">
+          {error} <button className="btn btn-ghost btn-sm" onClick={loadData}>Retry</button>
+        </div>
+      ) : loading ? (
         <div className="panel"><div className="panel-body t-caption">Loading complaints...</div></div>
       ) : complaints.length === 0 ? (
         <div className="panel"><div className="panel-body t-caption">No complaints are available.</div></div>
@@ -93,13 +98,20 @@ export default function AdminComplaints() {
                 return (
                   <tr key={complaint.id}>
                     <td className="col-id">#{complaint.id}</td>
-                    <td><div style={{ fontWeight: 500 }}>{label(complaint.finalIssueType)}</div>
+                    <td><div style={{ fontWeight: 500 }}>{complaintIssueTypeLabel(complaint.finalIssueType)}</div>
                       <div className="t-caption">{complaint.description}</div></td>
                     <td>{label(complaint.finalSeverity)}</td>
                     <td>{complaint.locationAddress}</td>
                     <td>{complaint.createdAt ? new Date(complaint.createdAt).toLocaleString('en-IN') : '—'}</td>
-                    <td>{linked ? `${linked.projectName} (#${linked.id})`
-                      : complaint.municipalProjectId ? `Project #${complaint.municipalProjectId}` : 'Unlinked'}</td>
+                    <td>{linked ? (
+                      <Link to={`/map?projectId=${linked.id}&wardId=${linked.wardId}`} className="linked-work-link">
+                        {linked.projectName} (#{linked.id})
+                      </Link>
+                    ) : complaint.municipalProjectId ? (
+                      <Link to={`/map?projectId=${complaint.municipalProjectId}`} className="linked-work-link">
+                        Project #{complaint.municipalProjectId}
+                      </Link>
+                    ) : 'Unlinked'}</td>
                     <td style={{ minWidth: 230 }}>
                       {!complaint.municipalProjectId && (
                         <div style={{ display: 'flex', gap: 6 }}>

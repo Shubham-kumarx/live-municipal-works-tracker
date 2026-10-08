@@ -28,10 +28,12 @@ public class ComplaintService {
     private final ProjectRepository projectRepository;
     private final ProjectAccessService projectAccessService;
 
+    @Transactional
     public ComplaintResponse create(ComplaintCreateRequest request, MultipartFile image, User actor) {
         if (actor == null || actor.getRole() != Role.CITIZEN) {
             throw new AccessDeniedException("Only citizens can submit complaints");
         }
+        validateIssueTypes(request);
         validatePredictionState(request);
         ComplaintImageService.StoredComplaintImage stored = complaintImageService.store(image);
         try {
@@ -92,7 +94,11 @@ public class ComplaintService {
     }
 
     @Transactional(readOnly = true)
-    public List<LinkedComplaintResponse> getLinkedComplaints(Long projectId) {
+    public List<LinkedComplaintResponse> getLinkedComplaints(Long projectId, User actor) {
+        MunicipalProject project = projectRepository.findById(projectId)
+                .orElseThrow(() -> new ResponseStatusException(NOT_FOUND,
+                        "Project not found: " + projectId));
+        projectAccessService.requireProjectWardAccess(actor, project);
         return complaintRepository.findByMunicipalProjectIdOrderByCreatedAtDesc(projectId).stream()
                 .map(LinkedComplaintResponse::from)
                 .toList();
@@ -122,6 +128,16 @@ public class ComplaintService {
                 throw new AccessDeniedException("You cannot access complaints from another ward");
             }
         }
+    }
+
+    @Transactional(readOnly = true)
+    public List<ComplaintResponse> listForCitizen(User actor) {
+        if (actor == null || actor.getRole() != Role.CITIZEN) {
+            throw new AccessDeniedException("Only citizens can access their submitted complaints");
+        }
+        return complaintRepository.findByReportingUserIdOrderByCreatedAtDesc(actor.getId()).stream()
+                .map(ComplaintResponse::from)
+                .toList();
     }
 
     @Transactional(readOnly = true)
@@ -184,6 +200,19 @@ public class ComplaintService {
                 && (request.finalIssueType() != request.aiPredictedIssueType()
                     || request.finalSeverity() != request.aiSuggestedSeverity())) {
             throw new IllegalArgumentException("Confirmed classification must match the AI suggestion");
+        }
+    }
+
+    private void validateIssueTypes(ComplaintCreateRequest request) {
+        if (request.finalIssueType() == null
+                || !request.finalIssueType().isSupportedClassification()) {
+            throw new IllegalArgumentException(
+                    "Final issue type must be DOMESTIC_TRASH, ILLEGAL_PARKING, DAMAGED_SIGN, or POTHOLE");
+        }
+        if (request.aiPredictedIssueType() != null
+                && !request.aiPredictedIssueType().isSupportedClassification()) {
+            throw new IllegalArgumentException(
+                    "AI predicted issue type must be DOMESTIC_TRASH, ILLEGAL_PARKING, DAMAGED_SIGN, or POTHOLE");
         }
     }
 }

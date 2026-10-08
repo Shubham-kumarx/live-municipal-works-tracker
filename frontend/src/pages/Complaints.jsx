@@ -1,26 +1,44 @@
-import { useEffect, useRef, useState } from 'react'
+import { useCallback, useEffect, useRef, useState } from 'react'
 import api from '../api/axios'
+import { apiErrorMessage } from '../api/errors'
+import { COMPLAINT_ISSUE_TYPES, complaintIssueTypeLabel } from '../constants/complaintIssueTypes'
 
 const MAX_IMAGE_BYTES = 10 * 1024 * 1024
-const ISSUE_TYPES = ['POTHOLE', 'ROAD_CRACK', 'GARBAGE_ACCUMULATION', 'WATERLOGGING',
-  'DAMAGED_STREETLIGHT', 'OPEN_MANHOLE', 'OTHER']
 const SEVERITIES = ['LOW', 'MEDIUM', 'HIGH', 'CRITICAL']
 const label = value => value?.replaceAll('_', ' ').toLowerCase().replace(/^./, c => c.toUpperCase())
 
 export default function Complaints() {
+  const [complaints, setComplaints] = useState([])
+  const [complaintsLoading, setComplaintsLoading] = useState(true)
+  const [complaintsError, setComplaintsError] = useState('')
   const [image, setImage] = useState(null)
   const [previewUrl, setPreviewUrl] = useState('')
   const [error, setError] = useState('')
   const [analysis, setAnalysis] = useState(null)
   const [analyzing, setAnalyzing] = useState(false)
   const [predictionState, setPredictionState] = useState('MANUAL')
-  const [finalIssueType, setFinalIssueType] = useState('OTHER')
+  const [finalIssueType, setFinalIssueType] = useState('')
   const [finalSeverity, setFinalSeverity] = useState('MEDIUM')
   const [description, setDescription] = useState('')
   const [locationAddress, setLocationAddress] = useState('')
   const [submitting, setSubmitting] = useState(false)
   const [submittedId, setSubmittedId] = useState(null)
   const fileInput = useRef(null)
+
+  const loadComplaints = useCallback(async () => {
+    setComplaintsLoading(true)
+    setComplaintsError('')
+    try {
+      const { data } = await api.get('/api/complaints/my')
+      setComplaints(Array.isArray(data) ? data : [])
+    } catch (requestError) {
+      setComplaintsError(apiErrorMessage(requestError, 'Your complaints could not be loaded.'))
+    } finally {
+      setComplaintsLoading(false)
+    }
+  }, [])
+
+  useEffect(() => { loadComplaints() }, [loadComplaints])
 
   useEffect(() => {
     if (!image) {
@@ -38,6 +56,7 @@ export default function Complaints() {
     setSubmittedId(null)
     setAnalysis(null)
     setPredictionState('MANUAL')
+    setFinalIssueType('')
     if (!file) {
       setImage(null)
       return
@@ -74,16 +93,21 @@ export default function Complaints() {
     body.append('image', image)
     try {
       const { data } = await api.post('/api/complaints/analyze', body)
-      const candidate = data.issueType || data.candidateIssueType
       setAnalysis(data)
-      setFinalIssueType(candidate)
-      setFinalSeverity(data.suggestedSeverity)
-      setPredictionState(data.issueType ? 'CONFIRMED' : 'EDITED')
+      if (data.issueType) {
+        setFinalIssueType(data.issueType)
+        setFinalSeverity(data.suggestedSeverity)
+        setPredictionState('CONFIRMED')
+      } else {
+        setFinalIssueType('')
+        setFinalSeverity('MEDIUM')
+        setPredictionState('EDITED')
+      }
     } catch (requestError) {
       setAnalysis(null)
       setPredictionState('MANUAL')
-      setError(requestError.response?.data?.message
-        || 'AI analysis is unavailable. You can classify and submit the issue manually.')
+      setError(apiErrorMessage(requestError,
+        'AI analysis is unavailable. You can classify and submit the issue manually.'))
     } finally {
       setAnalyzing(false)
     }
@@ -96,7 +120,7 @@ export default function Complaints() {
       setFinalSeverity(analysis.suggestedSeverity)
     }
     if (nextState === 'REJECTED') {
-      setFinalIssueType('OTHER')
+      setFinalIssueType('')
       setFinalSeverity('MEDIUM')
     }
     if (nextState === 'MANUAL') setAnalysis(null)
@@ -141,16 +165,17 @@ export default function Complaints() {
     try {
       const { data } = await api.post('/api/complaints', body)
       setSubmittedId(data.id)
+      await loadComplaints()
       setImage(null)
       setAnalysis(null)
       setPredictionState('MANUAL')
-      setFinalIssueType('OTHER')
+      setFinalIssueType('')
       setFinalSeverity('MEDIUM')
       setDescription('')
       setLocationAddress('')
       if (fileInput.current) fileInput.current.value = ''
     } catch (requestError) {
-      setError(requestError.response?.data?.message || 'Complaint could not be submitted. Try again.')
+      setError(apiErrorMessage(requestError, 'Complaint could not be submitted. Try again.'))
     } finally {
       setSubmitting(false)
     }
@@ -163,14 +188,59 @@ export default function Complaints() {
     if (fileInput.current) fileInput.current.value = ''
   }
 
-  const canSubmit = image && description.trim() && locationAddress.trim() && !submitting && !analyzing
+  const canSubmit = image && finalIssueType && description.trim() && locationAddress.trim()
+    && !submitting && !analyzing
 
   return (
     <div className="complaint-page">
       <div className="page-header">
         <div className="page-header-left">
-          <div className="t-page">Report a municipal issue</div>
-          <div className="t-caption">Upload a clear photo, review any AI suggestion, and confirm the final details.</div>
+          <h1 className="t-page">My Complaints</h1>
+          <div className="t-caption">Review issues reported from your account or report another municipal issue.</div>
+        </div>
+        <button type="button" className="btn btn-sm" onClick={loadComplaints}
+          disabled={complaintsLoading}>Refresh</button>
+      </div>
+
+      {complaintsLoading ? (
+        <div className="panel"><div className="panel-body t-caption">Loading your complaints...</div></div>
+      ) : complaintsError ? (
+        <div className="complaint-message complaint-error" role="alert">
+          {complaintsError} <button type="button" className="btn btn-ghost btn-sm"
+            onClick={loadComplaints}>Retry</button>
+        </div>
+      ) : complaints.length === 0 ? (
+        <div className="panel"><div className="panel-body t-caption">No complaints reported yet.</div></div>
+      ) : (
+        <div className="panel operational-table" style={{ overflowX: 'auto' }}>
+          <table className="data-table">
+            <thead><tr>
+              <th>ID</th><th>Issue</th><th>Severity</th><th>Status</th><th>Location</th><th>Reported</th>
+            </tr></thead>
+            <tbody>
+              {complaints.map(complaint => (
+                <tr key={complaint.id}>
+                  <td className="col-id">#{complaint.id}</td>
+                  <td>
+                    <div style={{ fontWeight: 500 }}>{complaintIssueTypeLabel(complaint.finalIssueType)}</div>
+                    <div className="t-caption">{complaint.description}</div>
+                  </td>
+                  <td>{label(complaint.finalSeverity)}</td>
+                  <td>{label(complaint.status)}</td>
+                  <td>{complaint.locationAddress}</td>
+                  <td>{complaint.createdAt
+                    ? new Date(complaint.createdAt).toLocaleString('en-IN') : '—'}</td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
+      )}
+
+      <div className="page-header">
+        <div className="page-header-left">
+          <h2 className="t-heading">Report a municipal issue</h2>
+          <div className="t-caption">Upload a clear photo, review any AI-assisted suggestion, and confirm the final details.</div>
         </div>
       </div>
 
@@ -213,22 +283,24 @@ export default function Complaints() {
       {analysis && (
         <div className="panel complaint-panel">
           <div className="panel-header">
-            <span className="t-strong">AI suggestion</span>
+            <span className="t-strong">AI-assisted suggestion</span>
             <span className={`badge ${analysis.confidenceLevel === 'HIGH' ? 'badge-done' : analysis.confidenceLevel === 'MEDIUM' ? 'badge-pend' : 'badge-late'}`}>
               {analysis.confidenceLevel} confidence
             </span>
           </div>
           <div className="panel-body">
             <div className="complaint-prediction-grid">
-              <div><div className="t-label">Detected type</div><div className="t-strong">{label(analysis.candidateIssueType)}</div></div>
+              <div><div className="t-label">Detected type</div><div className="t-strong">{complaintIssueTypeLabel(analysis.candidateIssueType)}</div></div>
               <div><div className="t-label">Relative model score</div><div className="t-strong">{(analysis.confidence * 100).toFixed(1)}%</div></div>
               <div><div className="t-label">Category</div><div className="t-strong">{label(analysis.category)}</div></div>
               <div><div className="t-label">Suggested severity</div><div className="t-strong">{label(analysis.suggestedSeverity)}</div></div>
             </div>
             <div className="complaint-message complaint-ai-note">
-              {analysis.requiresManualReview
-                ? 'The score is low. Select the correct issue and severity before submitting.'
-                : 'This is an AI suggestion, not a verified assessment. Confirm or edit it before submitting.'}
+              {analysis.confidenceLevel === 'HIGH'
+                ? 'High confidence prediction. Confirm or edit it before submitting.'
+                : analysis.confidenceLevel === 'MEDIUM'
+                  ? 'Possible prediction — please verify the issue and severity before submitting.'
+                  : 'Unable to confidently identify the issue. Select the correct issue and severity manually.'}
             </div>
             <div className="complaint-actions">
               <button type="button" className="btn btn-primary" disabled={!analysis.issueType}
@@ -265,7 +337,10 @@ export default function Complaints() {
               setFinalIssueType(event.target.value)
               if (analysis && predictionState !== 'REJECTED') setPredictionState('EDITED')
             }}>
-              {ISSUE_TYPES.map(type => <option key={type} value={type}>{label(type)}</option>)}
+              <option value="">Select issue type</option>
+              {COMPLAINT_ISSUE_TYPES.map(type => (
+                <option key={type} value={type}>{complaintIssueTypeLabel(type)}</option>
+              ))}
             </select>
           </label>
           <label>

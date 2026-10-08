@@ -7,6 +7,7 @@ import com.municipal.tracker.dto.ComplaintLinkedProjectResponse;
 import com.municipal.tracker.dto.ProjectLinkOptionResponse;
 import com.municipal.tracker.model.User;
 import com.municipal.tracker.service.ComplaintService;
+import com.municipal.tracker.service.ComplaintImageAccessService;
 import com.municipal.tracker.service.ImageAnalysisService;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
@@ -33,6 +34,7 @@ import org.springframework.web.multipart.MultipartFile;
 public class ComplaintController {
     private final ImageAnalysisService imageAnalysisService;
     private final ComplaintService complaintService;
+    private final ComplaintImageAccessService complaintImageAccessService;
 
     @PostMapping("/analyze")
     @PreAuthorize("hasRole('CITIZEN')")
@@ -50,6 +52,14 @@ public class ComplaintController {
                 .body(complaintService.create(request, image, currentUser));
     }
 
+    @GetMapping("/{complaintId}/image")
+    public ResponseEntity<byte[]> image(@PathVariable Long complaintId,
+            @AuthenticationPrincipal User currentUser) {
+        ComplaintImageAccessService.AuthorizedImage image =
+                complaintImageAccessService.load(complaintId, currentUser);
+        return ResponseEntity.ok().contentType(image.mediaType()).body(image.bytes());
+    }
+
     @GetMapping("/{complaintId}/project")
     @PreAuthorize("hasAnyRole('WARD_OFFICER','MUNICIPAL_ADMIN')")
     public ResponseEntity<ComplaintLinkedProjectResponse> getLinkedProject(
@@ -58,6 +68,13 @@ public class ComplaintController {
         return complaintService.getLinkedProject(complaintId, currentUser)
                 .map(ResponseEntity::ok)
                 .orElseGet(() -> ResponseEntity.noContent().build());
+    }
+
+    @GetMapping("/my")
+    @PreAuthorize("hasRole('CITIZEN')")
+    public ResponseEntity<List<ComplaintResponse>> listMine(
+            @AuthenticationPrincipal User currentUser) {
+        return ResponseEntity.ok(complaintService.listForCitizen(currentUser));
     }
 
     @GetMapping
